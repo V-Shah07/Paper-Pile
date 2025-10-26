@@ -1,24 +1,56 @@
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
+/**
+ * Root Layout
+ * 
+ * Top-level layout for the entire app.
+ * Wraps all routes and can be used for:
+ * - Global providers (Auth, Theme, etc.)
+ * - Font loading
+ * - Splash screen handling
+ */
+
 import { Stack } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
-import 'react-native-reanimated';
+import { useFonts } from 'expo-font';
+import * as SplashScreen from 'expo-splash-screen';
+import { useEffect } from 'react';
 
-import { useColorScheme } from '@/hooks/use-color-scheme';
-
-export const unstable_settings = {
-  anchor: '(tabs)',
-};
+// Prevent splash screen from auto-hiding
+SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
-  const colorScheme = useColorScheme();
+  // Load fonts if needed
+  const [fontsLoaded] = useFonts({
+    // Add custom fonts here if you want
+    // 'Inter-Regular': require('../assets/fonts/Inter-Regular.ttf'),
+  });
+
+  useEffect(() => {
+    if (fontsLoaded) {
+      SplashScreen.hideAsync();
+    }
+  }, [fontsLoaded]);
+
+  if (!fontsLoaded) {
+    return null;
+  }
 
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <Stack>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
-      </Stack>
-      <StatusBar style="auto" />
-    </ThemeProvider>
+    <Stack
+      screenOptions={{
+        headerShown: false,
+        contentStyle: { backgroundColor: '#FFFFFF' },
+      }}
+    >
+      {/* Entry point - handles auth check and redirect */}
+      <Stack.Screen name="index" />
+      
+      {/* Auth stack */}
+      <Stack.Screen name="auth" />
+      
+      {/* Main app tabs */}
+      <Stack.Screen name="(tabs)" />
+      
+      {/* Other screens */}
+      <Stack.Screen name="screens" />
+    </Stack>
   );
 }

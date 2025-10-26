@@ -1,98 +1,311 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
+/**
+ * Home Screen (Documents List) - WITH UPLOAD MODAL INTEGRATED
+ */
 
-import { HelloWave } from '@/components/hello-wave';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Link } from 'expo-router';
+import { Ionicons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
+import React, { useMemo, useState } from "react";
+import {
+  FlatList,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+  Alert,
+} from "react-native";
+import * as ImagePicker from 'expo-image-picker'; // You'll need to install this
+
+// Import components
+import DocumentCard from "@/components/DocumentCard";
+import EmptyState from "@/components/EmptyState";
+import FloatingActionButton from "@/components/FloatingActionButton";
+import SearchBar from "@/components/SearchBar";
+import UploadModal from "@/components/uploadModal"; // NEW IMPORT
+
+// Import constants
+import { CATEGORIES, CategoryType } from "@/constants/categories";
+import { DUMMY_DOCUMENTS, Document } from "@/constants/dummyData";
+import { Colors, Spacing, Typography } from "@/constants/theme";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function HomeScreen() {
-  return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">hello world!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12',
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <Link href="/modal">
-          <Link.Trigger>
-            <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-          </Link.Trigger>
-          <Link.Preview />
-          <Link.Menu>
-            <Link.MenuAction title="Action" icon="cube" onPress={() => alert('Action pressed')} />
-            <Link.MenuAction
-              title="Share"
-              icon="square.and.arrow.up"
-              onPress={() => alert('Share pressed')}
-            />
-            <Link.Menu title="More" icon="ellipsis">
-              <Link.MenuAction
-                title="Delete"
-                icon="trash"
-                destructive
-                onPress={() => alert('Delete pressed')}
-              />
-            </Link.Menu>
-          </Link.Menu>
-        </Link>
+  const router = useRouter();
 
-        <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+  // State
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState<CategoryType | "all">("all");
+  const [showUploadModal, setShowUploadModal] = useState(false); // NEW STATE
+
+  // Filter documents
+  const filteredDocuments = useMemo(() => {
+    let filtered = DUMMY_DOCUMENTS;
+
+    if (selectedCategory !== "all") {
+      filtered = filtered.filter((doc) => doc.category === selectedCategory);
+    }
+
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(
+        (doc) =>
+          doc.title.toLowerCase().includes(query) ||
+          doc.tags.some((tag) => tag.toLowerCase().includes(query)) ||
+          doc.summary.toLowerCase().includes(query)
+      );
+    }
+
+    return filtered;
+  }, [searchQuery, selectedCategory]);
+
+  // Navigate to search tab
+  const handleSearchBarPress = () => {
+    router.push("/(tabs)/search");
+  };
+
+  // Navigate to document detail
+  const handleDocumentPress = (document: Document) => {
+    router.push({
+      pathname: '/screens/documentDetail', 
+      params: { documentId: document.id }
+    });
+  };
+
+  // Show upload modal when FAB is pressed
+  const handleAddDocument = () => {
+    setShowUploadModal(true);
+  };
+
+  // Handle camera selection
+  const handleSelectCamera = async () => {
+    // Request camera permissions
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    
+    if (status !== 'granted') {
+      Alert.alert('Permission needed', 'Camera permission is required to scan documents');
+      return;
+    }
+
+    // Launch camera
+    const result = await ImagePicker.launchCameraAsync({
+      allowsEditing: true,
+      quality: 1,
+      aspect: [3, 4],
+    });
+
+    if (!result.canceled && result.assets[0]) {
+      // Navigate to edit details screen with image URI
+      router.push({
+        pathname: '/screens/editDetails',
+        params: { imageUri: result.assets[0].uri }
+      });
+    }
+  };
+
+  // Handle file selection
+  const handleSelectFiles = async () => {
+    // Request media library permissions
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    
+    if (status !== 'granted') {
+      Alert.alert('Permission needed', 'Photos permission is required to select documents');
+      return;
+    }
+
+    // Launch image picker
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      quality: 1,
+      aspect: [3, 4],
+    });
+
+    if (!result.canceled && result.assets[0]) {
+      // Navigate to edit details screen with image URI
+      router.push({
+        pathname: '/screens/editDetails',
+        params: { imageUri: result.assets[0].uri }
+      });
+    }
+  };
+
+  // Handle email forward
+  const handleSelectEmail = () => {
+    // For now, show the user's unique email address
+    Alert.alert(
+      'Forward Email',
+      'Send documents to:\npaperpile.user123@paperpile.app\n\nComing soon!',
+      [{ text: 'OK' }]
+    );
+  };
+
+  // Render category chip
+  const renderCategoryChip = (category: CategoryType | "all", label: string) => {
+    const isSelected = selectedCategory === category;
+
+    return (
+      <TouchableOpacity
+        key={category}
+        style={[styles.filterChip, isSelected && styles.filterChipSelected]}
+        onPress={() => setSelectedCategory(category)}
+      >
+        <Text
+          style={[
+            styles.filterChipText,
+            isSelected && styles.filterChipTextSelected,
+          ]}
+        >
+          {label}
+        </Text>
+      </TouchableOpacity>
+    );
+  };
+
+  return (
+    <SafeAreaView style={styles.container}>
+      {/* Header */}
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>Documents</Text>
+        <TouchableOpacity>
+          <Ionicons name="filter" size={24} color={Colors.text} />
+        </TouchableOpacity>
+      </View>
+
+      {/* Search Bar */}
+      <View style={styles.searchContainer}>
+        <TouchableOpacity onPress={handleSearchBarPress} style={{ flex: 1 }}>
+          <SearchBar
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            placeholder="Search documents..."
+          />
+        </TouchableOpacity>
+      </View>
+
+      {/* Category Filters */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={[styles.filtersContent, { marginTop: Spacing.lg }]}
+      >
+        {renderCategoryChip("all", "All")}
+        {CATEGORIES.map((category) =>
+          renderCategoryChip(category.id, category.label)
+        )}
+      </ScrollView>
+
+      {/* Document Count */}
+      <View style={styles.countContainer}>
+        <Text style={styles.countText}>
+          {filteredDocuments.length}{" "}
+          {filteredDocuments.length === 1 ? "document" : "documents"}
+        </Text>
+      </View>
+
+      {/* Documents List */}
+      {filteredDocuments.length > 0 ? (
+        <FlatList
+          data={filteredDocuments}
+          keyExtractor={(item) => item.id}
+          renderItem={({ item }) => (
+            <DocumentCard
+              document={item}
+              onPress={() => handleDocumentPress(item)}
+            />
+          )}
+          contentContainerStyle={styles.listContent}
+          showsVerticalScrollIndicator={false}
+        />
+      ) : (
+        <EmptyState
+          icon={searchQuery ? "search-outline" : "document-text-outline"}
+          title={searchQuery ? "No results found" : "No documents yet"}
+          subtitle={
+            searchQuery
+              ? "Try a different search term or category"
+              : "Tap the + button to scan your first document"
+          }
+        />
+      )}
+
+      {/* Floating Action Button */}
+      <FloatingActionButton onPress={handleAddDocument} />
+
+      {/* Upload Modal - NEW */}
+      <UploadModal
+        visible={showUploadModal}
+        onClose={() => setShowUploadModal(false)}
+        onSelectCamera={handleSelectCamera}
+        onSelectFiles={handleSelectFiles}
+        onSelectEmail={handleSelectEmail}
+      />
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  titleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+  container: {
+    flex: 1,
+    backgroundColor: Colors.background,
   },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
+  header: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: Spacing.screenPadding,
+    paddingVertical: Spacing.md,
   },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
+  headerTitle: {
+    fontSize: Typography.sizes["3xl"],
+    fontWeight: Typography.weights.bold,
+    color: Colors.text,
+  },
+  searchContainer: {
+    paddingHorizontal: Spacing.screenPadding,
+    marginBottom: Spacing.lg,
+  },
+  filtersContent: {
+    paddingHorizontal: Spacing.screenPadding,
+    paddingVertical: Spacing.sm,
+    flexDirection: "row",
+    marginBottom: Spacing["2xl"],
+  },
+  filterChip: {
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm + 2,
+    borderRadius: 20,
+    backgroundColor: Colors.backgroundSecondary,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    marginRight: Spacing.sm,
+    height: 36,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  filterChipSelected: {
+    backgroundColor: Colors.primary,
+    borderColor: Colors.primary,
+  },
+  filterChipText: {
+    fontSize: Typography.sizes.sm,
+    fontWeight: Typography.weights.medium,
+    color: Colors.text,
+    includeFontPadding: false,
+    textAlignVertical: "center",
+  },
+  filterChipTextSelected: {
+    color: Colors.background,
+  },
+  countContainer: {
+    paddingHorizontal: Spacing.screenPadding,
+    marginBottom: Spacing.sm,
+  },
+  countText: {
+    fontSize: Typography.sizes.sm,
+    color: Colors.textSecondary,
+  },
+  listContent: {
+    paddingHorizontal: Spacing.screenPadding,
+    paddingBottom: 100,
   },
 });
