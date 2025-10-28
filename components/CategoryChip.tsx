@@ -6,11 +6,12 @@
  */
 
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { CategoryType, getCategoryById } from '@/constants/categories';
-import { Colors, Typography, BorderRadius, Spacing } from '@/constants/theme';
+import { Typography } from '@/constants/theme';
 import { getCategoryColor } from '@/constants/theme';
+import { styles } from './CategoryChip.styles';
 
 interface CategoryChipProps {
   category: CategoryType;
@@ -84,18 +85,3 @@ export default function CategoryChip({
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'flex-start', // Don't stretch to fill width
-    borderRadius: BorderRadius.full, // Fully rounded pill shape
-  },
-  icon: {
-    marginRight: 4,
-  },
-  label: {
-    fontWeight: Typography.weights.medium,
-  },
-});

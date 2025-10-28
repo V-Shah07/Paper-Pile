@@ -6,9 +6,10 @@
  */
 
 import React from 'react';
-import { TouchableOpacity, StyleSheet, Platform } from 'react-native';
+import { TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors, Shadows } from '@/constants/theme';
+import { Colors } from '@/constants/theme';
+import { styles } from './FloatingActionButton.styles';
 
 interface FloatingActionButtonProps {
   onPress: () => void;
@@ -35,17 +36,3 @@ export default function FloatingActionButton({
     </TouchableOpacity>
   );
 }
-
-const styles = StyleSheet.create({
-  fab: {
-    position: 'absolute',
-    right: 16,
-    bottom: Platform.OS === 'ios' ? 30 : 10, // Account for tab bar
-    width: 56,
-    height: 56,
-    borderRadius: 28, // Circular
-    justifyContent: 'center',
-    alignItems: 'center',
-    ...Shadows.lg, // Strong shadow for elevation
-  },
-});

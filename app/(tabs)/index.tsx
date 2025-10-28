@@ -8,7 +8,6 @@ import React, { useMemo, useState } from "react";
 import {
   FlatList,
   ScrollView,
-  StyleSheet,
   Text,
   TouchableOpacity,
   View,
@@ -26,8 +25,9 @@ import UploadModal from "@/components/uploadModal"; // NEW IMPORT
 // Import constants
 import { CATEGORIES, CategoryType } from "@/constants/categories";
 import { DUMMY_DOCUMENTS, Document } from "@/constants/dummyData";
-import { Colors, Spacing, Typography } from "@/constants/theme";
+import { Colors, Spacing } from "@/constants/theme";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { styles } from "./index.styles";
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -242,70 +242,3 @@ export default function HomeScreen() {
     </SafeAreaView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.background,
-  },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: Spacing.screenPadding,
-    paddingVertical: Spacing.md,
-  },
-  headerTitle: {
-    fontSize: Typography.sizes["3xl"],
-    fontWeight: Typography.weights.bold,
-    color: Colors.text,
-  },
-  searchContainer: {
-    paddingHorizontal: Spacing.screenPadding,
-    marginBottom: Spacing.lg,
-  },
-  filtersContent: {
-    paddingHorizontal: Spacing.screenPadding,
-    paddingVertical: Spacing.sm,
-    flexDirection: "row",
-    marginBottom: Spacing["2xl"],
-  },
-  filterChip: {
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm + 2,
-    borderRadius: 20,
-    backgroundColor: Colors.backgroundSecondary,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    marginRight: Spacing.sm,
-    height: 36,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  filterChipSelected: {
-    backgroundColor: Colors.primary,
-    borderColor: Colors.primary,
-  },
-  filterChipText: {
-    fontSize: Typography.sizes.sm,
-    fontWeight: Typography.weights.medium,
-    color: Colors.text,
-    includeFontPadding: false,
-    textAlignVertical: "center",
-  },
-  filterChipTextSelected: {
-    color: Colors.background,
-  },
-  countContainer: {
-    paddingHorizontal: Spacing.screenPadding,
-    marginBottom: Spacing.sm,
-  },
-  countText: {
-    fontSize: Typography.sizes.sm,
-    color: Colors.textSecondary,
-  },
-  listContent: {
-    paddingHorizontal: Spacing.screenPadding,
-    paddingBottom: 100,
-  },
-});

@@ -1,5 +1,5 @@
 /**
- * Login Screen
+ * Login Screen - FIXED VERSION
  * 
  * Allows existing users to log in with email and password.
  * Includes validation, error handling, and forgot password link.
@@ -27,9 +27,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { Colors, Typography, Spacing, BorderRadius, Shadows } from '@/constants/theme';
+import { useAuth } from '@/context/AuthContext'; // ← ADDED THIS
 
 export default function LoginScreen() {
   const router = useRouter();
+  const { login, resetPassword } = useAuth(); // ← ADDED THIS
 
   // Form state
   const [email, setEmail] = useState('');
@@ -45,6 +47,8 @@ export default function LoginScreen() {
 
   // Handle login
   const handleLogin = async () => {
+    console.log('🟢 [Login Screen] Starting validation...');
+    
     // Validate inputs
     if (!email.trim()) {
       Alert.alert('Error', 'Please enter your email address');
@@ -66,32 +70,45 @@ export default function LoginScreen() {
       return;
     }
 
+    console.log('🟢 [Login Screen] Validation passed!');
+    console.log('🟢 [Login Screen] Calling login function...');
+    
     setIsLoading(true);
 
-    // TODO: Call your login API
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1500));
-
-      // For demo purposes - always succeed
-      console.log('Logging in with:', email, password);
+      await login(email, password);
+      console.log('🟢 [Login Screen] Login successful! Redirecting...');
+      router.replace('/(tabs)');
+    } catch (error: any) {
+      console.error('🔴 [Login Screen] Login failed:', error);
       
-      // TODO: Store auth token
-      // TODO: Navigate to main app
-      router.replace('/(tabs)'); // Navigate to main app tabs
+      let errorMessage = 'Invalid email or password. Please try again.';
       
-    } catch (error) {
-      Alert.alert('Login Failed', 'Invalid email or password. Please try again.');
-      console.error('Login error:', error);
+      if (error.code === 'auth/invalid-credential') {
+        errorMessage = 'Invalid email or password. Please try again.';
+      } else if (error.code === 'auth/user-not-found') {
+        errorMessage = 'No account found with this email. Please sign up first.';
+      } else if (error.code === 'auth/wrong-password') {
+        errorMessage = 'Incorrect password. Please try again.';
+      }
+      
+      Alert.alert('Login Failed', errorMessage);
     } finally {
       setIsLoading(false);
     }
+
+
   };
 
   // Handle forgot password
-  const handleForgotPassword = () => {
+  const handleForgotPassword = async () => {
     if (!email.trim()) {
       Alert.alert('Reset Password', 'Please enter your email address first');
+      return;
+    }
+
+    if (!isValidEmail(email)) {
+      Alert.alert('Error', 'Please enter a valid email address');
       return;
     }
 
@@ -102,9 +119,13 @@ export default function LoginScreen() {
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Send Link',
-          onPress: () => {
-            // TODO: Call forgot password API
-            Alert.alert('Success', 'Password reset link sent! Check your email.');
+          onPress: async () => {
+            try {
+              await resetPassword(email);
+              Alert.alert('Success', 'Password reset link sent! Check your email.');
+            } catch (error: any) {
+              Alert.alert('Error', 'Failed to send reset email. Please try again.');
+            }
           },
         },
       ]

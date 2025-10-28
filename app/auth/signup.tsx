@@ -27,9 +27,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { Colors, Typography, Spacing, BorderRadius, Shadows } from '@/constants/theme';
+import { useAuth } from '@/context/AuthContext';
 
 export default function SignupScreen() {
   const router = useRouter();
+  const { signup } = useAuth(); // ← ADDED THIS LINE!
 
   // Form state
   const [name, setName] = useState('');
@@ -49,59 +51,58 @@ export default function SignupScreen() {
 
   // Handle signup
   const handleSignup = async () => {
+    console.log('🟢 [Signup Screen] Starting validation...');
+    
     // Validate inputs
     if (!name.trim()) {
       Alert.alert('Error', 'Please enter your name');
       return;
     }
-
+  
     if (!email.trim()) {
       Alert.alert('Error', 'Please enter your email address');
       return;
     }
-
+  
     if (!isValidEmail(email)) {
       Alert.alert('Error', 'Please enter a valid email address');
       return;
     }
-
+  
     if (!password) {
       Alert.alert('Error', 'Please enter a password');
       return;
     }
-
+  
     if (password.length < 8) {
       Alert.alert('Error', 'Password must be at least 8 characters');
       return;
     }
-
+  
     if (password !== confirmPassword) {
       Alert.alert('Error', 'Passwords do not match');
       return;
     }
-
+  
     if (!agreeToTerms) {
       Alert.alert('Error', 'Please agree to the Terms of Service and Privacy Policy');
       return;
     }
-
+  
+    console.log('🟢 [Signup Screen] Validation passed!');
+    console.log('🟢 [Signup Screen] Calling signup function...');
+    
     setIsLoading(true);
-
-    // TODO: Call your signup API
+  
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1500));
-
-      // For demo purposes - always succeed
-      console.log('Creating account for:', name, email);
+      // THIS IS THE CRITICAL LINE - must call the signup function from AuthContext
+      await signup(email, password, name);
       
-      // TODO: Store auth token
-      // TODO: Navigate to main app
-      router.replace('/(tabs)'); // Navigate to main app tabs
-      
-    } catch (error) {
-      Alert.alert('Signup Failed', 'Something went wrong. Please try again.');
-      console.error('Signup error:', error);
+      console.log('🟢 [Signup Screen] Signup successful! Redirecting...');
+      router.replace('/(tabs)');
+    } catch (error: any) {
+      console.error('🔴 [Signup Screen] Signup failed:', error);
+      Alert.alert('Signup Failed', error.message || 'Something went wrong. Please try again.');
     } finally {
       setIsLoading(false);
     }

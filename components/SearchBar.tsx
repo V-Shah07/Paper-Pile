@@ -6,15 +6,14 @@
  */
 
 import React from 'react';
-import { 
-  View, 
-  TextInput, 
-  StyleSheet, 
+import {
+  View,
+  TextInput,
   TouchableOpacity,
-  Platform 
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors, Typography, BorderRadius, Spacing, Shadows } from '@/constants/theme';
+import { Colors } from '@/constants/theme';
+import { styles } from './SearchBar.styles';
 
 interface SearchBarProps {
   value: string;
@@ -79,35 +78,3 @@ export default function SearchBar({
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Colors.backgroundSecondary,
-    borderRadius: BorderRadius.lg,
-    paddingHorizontal: Spacing.md,
-    height: 48,
-    ...Shadows.sm, // Subtle shadow
-  },
-  searchIcon: {
-    marginRight: Spacing.sm,
-  },
-  input: {
-    flex: 1,
-    fontSize: Typography.sizes.base,
-    color: Colors.text,
-    // Platform-specific adjustments
-    ...Platform.select({
-      ios: {
-        paddingVertical: 12,
-      },
-      android: {
-        paddingVertical: 8,
-      },
-    }),
-  },
-  clearButton: {
-    padding: 4, // Extra touchable area
-  },
-});
