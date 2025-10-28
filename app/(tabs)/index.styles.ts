@@ -66,4 +66,15 @@ export const styles = StyleSheet.create({
     paddingHorizontal: Spacing.screenPadding,
     paddingBottom: 100,
   },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: Spacing.xl,
+  },
+  loadingText: {
+    marginTop: Spacing.md,
+    fontSize: Typography.sizes.base,
+    color: Colors.textSecondary,
+  },
 });

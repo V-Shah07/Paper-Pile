@@ -1,51 +1,227 @@
 /**
- * Document Detail Screen
- * 
- * Full-screen view of a document with all details, metadata, and actions.
- * Shows document image, AI summary, extracted text, and action buttons.
- * 
- * USAGE:
- * - Place this in your app/(tabs) or app/screens folder
- * - Navigate to it with: router.push({ pathname: '/document-detail', params: { documentId: doc.id } })
- * - For now using dummy data, replace with API call later
+ * Document Detail Screen - FIXED VERSION
+ *
+ * Now loads documents from Firestore instead of dummy data
  */
 
-import React, { useState } from 'react';
+import { db, storage } from "@/config/firebase";
+import { Ionicons } from "@expo/vector-icons";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import { deleteDoc, doc, getDoc } from "firebase/firestore";
+import { deleteObject, ref } from "firebase/storage";
+import React, { useEffect, useState } from "react";
 import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  Image,
-  TouchableOpacity,
+  ActivityIndicator,
   Alert,
+  Image,
   Platform,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 // Import components
-import CategoryChip from '@/components/CategoryChip';
+import CategoryChip from "@/components/CategoryChip";
 
 // Import constants
-import { Colors, Typography, Spacing, BorderRadius, Shadows } from '@/constants/theme';
-import { DUMMY_DOCUMENTS, Document } from '@/constants/dummyData';
+import {
+  BorderRadius,
+  Colors,
+  Shadows,
+  Spacing,
+  Typography,
+} from "@/constants/theme";
+import { useAuth } from "@/context/AuthContext";
+import { Document } from "../types/document";
 
 export default function DocumentDetailScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
-  
+  const { user } = useAuth();
+
   // State
+  const [document, setDocument] = useState<Document | null>(null);
+  const [loading, setLoading] = useState(true);
   const [isTextExpanded, setIsTextExpanded] = useState(false);
   const [imageHeight, setImageHeight] = useState(400);
 
-  // Get document by ID from params
-  // In real app, you'd fetch this from API
   const documentId = params.documentId as string;
-  const document = DUMMY_DOCUMENTS.find(doc => doc.id === documentId);
 
-  // If document not found, show error
+  // Load document from Firestore
+  useEffect(() => {
+    loadDocument();
+  }, [documentId]);
+
+  const loadDocument = async () => {
+    if (!documentId) {
+      Alert.alert("Error", "No document ID provided");
+      router.back();
+      return;
+    }
+
+    try {
+      console.log("📖 [DocumentDetail] Loading document:", documentId);
+      setLoading(true);
+
+      const docRef = doc(db, "documents", documentId);
+      const docSnap = await getDoc(docRef);
+
+      if (docSnap.exists()) {
+        const docData = { id: docSnap.id, ...docSnap.data() } as Document;
+        console.log("✅ [DocumentDetail] Document loaded:", docData);
+        setDocument(docData);
+      } else {
+        console.error("❌ [DocumentDetail] Document not found");
+        Alert.alert("Error", "Document not found", [
+          { text: "OK", onPress: () => router.back() },
+        ]);
+      }
+    } catch (error) {
+      console.error("❌ [DocumentDetail] Failed to load document:", error);
+      Alert.alert("Error", "Failed to load document", [
+        { text: "OK", onPress: () => router.back() },
+      ]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Format date helper
+  const formatDate = (dateInput: string | Date | null): string => {
+    if (!dateInput) return "N/A";
+
+    const date =
+      typeof dateInput === "string" ? new Date(dateInput) : dateInput;
+    return date.toLocaleDateString("en-US", {
+      month: "long",
+      day: "numeric",
+      year: "numeric",
+    });
+  };
+
+  // Handle actions
+  const handleEdit = () => {
+    if (!document) return;
+
+    console.log("Edit document:", document.id);
+    router.push({
+      pathname: "/screens/editDetails",
+      params: {
+        imageUri: document.imageUrl,
+        documentId: document.id,
+        isEditing: "true",
+      },
+    });
+  };
+
+  const handleShare = () => {
+    if (!document) return;
+
+    console.log("Share document:", document.id);
+    Alert.alert("Share", "Share functionality coming soon!");
+  };
+
+  const handleDelete = () => {
+    if (!document) return;
+
+    Alert.alert(
+      "Delete Document",
+      "Are you sure you want to delete this document? This action cannot be undone.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              console.log(
+                "🗑️ [DocumentDetail] Deleting document:",
+                document.id
+              );
+
+              // Delete from Firestore
+              await deleteDoc(doc(db, "documents", document.id));
+              console.log(
+                "✅ [DocumentDetail] Document deleted from Firestore"
+              );
+
+              // Optionally delete image from Storage
+              if (document.imageUrl && user) {
+                try {
+                  const imageRef = ref(
+                    storage,
+                    `documents/${user.uid}/${document.id}/original.jpg`
+                  );
+                  await deleteObject(imageRef);
+                  console.log("✅ [DocumentDetail] Image deleted from Storage");
+                } catch (storageError) {
+                  console.warn(
+                    "⚠️ [DocumentDetail] Failed to delete image from Storage:",
+                    storageError
+                  );
+                  // Continue anyway - document is deleted from Firestore
+                }
+              }
+
+              Alert.alert("Success", "Document deleted successfully", [
+                { text: "OK", onPress: () => router.push("/(tabs)") },
+              ]);
+            } catch (error) {
+              console.error("❌ [DocumentDetail] Delete failed:", error);
+              Alert.alert(
+                "Error",
+                "Failed to delete document. Please try again."
+              );
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleToggleSensitive = () => {
+    if (!document) return;
+
+    console.log("Toggle sensitive:", document.id);
+    Alert.alert(
+      document.isSensitive ? "Remove Sensitive Mark" : "Mark as Sensitive",
+      document.isSensitive
+        ? "This document will be visible to all family members."
+        : "This document will be hidden from other family members.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Confirm",
+          onPress: () => {
+            // TODO: Update document sensitivity in Firestore
+            console.log("Sensitivity toggled");
+          },
+        },
+      ]
+    );
+  };
+
+  // Show loading state
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => router.back()}>
+            <Ionicons name="arrow-back" size={24} color={Colors.text} />
+          </TouchableOpacity>
+        </View>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={Colors.primary} />
+          <Text style={styles.loadingText}>Loading document...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // Show error if document not found
   if (!document) {
     return (
       <SafeAreaView style={styles.container}>
@@ -55,80 +231,28 @@ export default function DocumentDetailScreen() {
           </TouchableOpacity>
         </View>
         <View style={styles.errorContainer}>
+          <Ionicons
+            name="document-outline"
+            size={64}
+            color={Colors.textLight}
+          />
           <Text style={styles.errorText}>Document not found</Text>
+          <TouchableOpacity
+            style={styles.errorButton}
+            onPress={() => router.back()}
+          >
+            <Text style={styles.errorButtonText}>Go Back</Text>
+          </TouchableOpacity>
         </View>
       </SafeAreaView>
     );
   }
 
-  // Format date helper
-  const formatDate = (isoDate: string): string => {
-    const date = new Date(isoDate);
-    return date.toLocaleDateString('en-US', {
-      month: 'long',
-      day: 'numeric',
-      year: 'numeric',
-    });
-  };
-
-  // Handle actions
-  const handleEdit = () => {
-    console.log('Edit document:', document.id);
-    //EDIT: router.push({ pathname: '/screens/editDetails', params: { imageUri, documentId, isEditing: 'true' } })
-    router.push({
-      pathname: '/screens/editDetails',
-      params: {imageUri: document.thumbnailUrl, documentId: document.id, isEditing: 'true'}
-    });
-  };
-
-  const handleShare = () => {
-    console.log('Share document:', document.id);
-    // TODO: Implement share
-    Alert.alert('Share', 'Share functionality coming soon!');
-  };
-
-  const handleDelete = () => {
-    Alert.alert(
-      'Delete Document',
-      'Are you sure you want to delete this document? This action cannot be undone.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: () => {
-            console.log('Delete document:', document.id);
-            // TODO: Call delete API
-            router.back();
-          },
-        },
-      ]
-    );
-  };
-
-  const handleToggleSensitive = () => {
-    console.log('Toggle sensitive:', document.id);
-    // TODO: Update document sensitivity
-    Alert.alert(
-      document.isSensitive ? 'Remove Sensitive Mark' : 'Mark as Sensitive',
-      document.isSensitive
-        ? 'This document will be visible to all family members.'
-        : 'This document will be hidden from other family members.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Confirm',
-          onPress: () => console.log('Sensitivity toggled'),
-        },
-      ]
-    );
-  };
-
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={styles.container} edges={["top"]}>
       {/* Header with Back Button and Actions */}
       <View style={styles.header}>
-        <TouchableOpacity 
+        <TouchableOpacity
           onPress={() => router.back()}
           style={styles.headerButton}
         >
@@ -136,35 +260,39 @@ export default function DocumentDetailScreen() {
         </TouchableOpacity>
 
         <View style={styles.headerActions}>
-          <TouchableOpacity 
-            onPress={handleShare}
-            style={styles.headerButton}
-          >
+          <TouchableOpacity onPress={handleShare} style={styles.headerButton}>
             <Ionicons name="share-outline" size={24} color={Colors.text} />
           </TouchableOpacity>
-          <TouchableOpacity 
-            onPress={handleEdit}
-            style={styles.headerButton}
-          >
+          <TouchableOpacity onPress={handleEdit} style={styles.headerButton}>
             <Ionicons name="create-outline" size={24} color={Colors.text} />
           </TouchableOpacity>
         </View>
       </View>
 
-      <ScrollView 
+      <ScrollView
         style={styles.scrollView}
         showsVerticalScrollIndicator={false}
       >
         {/* Document Image */}
         <View style={styles.imageContainer}>
           <Image
-            source={{ uri: document.thumbnailUrl }}
+            source={{ uri: document.imageUrl }}
             style={[styles.image, { height: imageHeight }]}
             resizeMode="contain"
+            onError={(error) => {
+              console.error(
+                "❌ [DocumentDetail] Image failed to load:",
+                error.nativeEvent
+              );
+            }}
           />
           {document.isSensitive && (
             <View style={styles.sensitiveBadge}>
-              <Ionicons name="lock-closed" size={16} color={Colors.background} />
+              <Ionicons
+                name="lock-closed"
+                size={16}
+                color={Colors.background}
+              />
               <Text style={styles.sensitiveBadgeText}>Sensitive</Text>
             </View>
           )}
@@ -182,28 +310,40 @@ export default function DocumentDetailScreen() {
 
           {/* Date Added */}
           <View style={styles.metaRow}>
-            <Ionicons name="calendar-outline" size={16} color={Colors.textSecondary} />
+            <Ionicons
+              name="calendar-outline"
+              size={16}
+              color={Colors.textSecondary}
+            />
             <Text style={styles.metaText}>
               Added {formatDate(document.dateAdded)}
             </Text>
           </View>
 
-          {/* Expiry Date (if exists) */}
-          {document.expiryDate && (
+          {/* Document Date */}
+          {document.dateDocument && (
             <View style={styles.metaRow}>
-              <Ionicons name="time-outline" size={16} color={Colors.textSecondary} />
+              <Ionicons
+                name="calendar-outline"
+                size={16}
+                color={Colors.textSecondary}
+              />
               <Text style={styles.metaText}>
-                Expires {formatDate(document.expiryDate)}
+                Document Date: {formatDate(document.dateDocument)}
               </Text>
             </View>
           )}
 
-          {/* Uploaded By (if exists) */}
-          {document.uploadedBy && (
+          {/* Expiry Date (if exists) */}
+          {document.expiryDate && (
             <View style={styles.metaRow}>
-              <Ionicons name="person-outline" size={16} color={Colors.textSecondary} />
+              <Ionicons
+                name="time-outline"
+                size={16}
+                color={Colors.textSecondary}
+              />
               <Text style={styles.metaText}>
-                Uploaded by {document.uploadedBy}
+                Expires {formatDate(document.expiryDate)}
               </Text>
             </View>
           )}
@@ -224,16 +364,18 @@ export default function DocumentDetailScreen() {
         <View style={styles.divider} />
 
         {/* AI Summary Section */}
-        <View style={styles.contentSection}>
-          <View style={styles.sectionHeader}>
-            <Ionicons name="sparkles" size={20} color={Colors.primary} />
-            <Text style={styles.sectionTitle}>Summary</Text>
-          </View>
-          <Text style={styles.summaryText}>{document.summary}</Text>
-        </View>
-
-        {/* Divider */}
-        <View style={styles.divider} />
+        {document.summary && (
+          <>
+            <View style={styles.contentSection}>
+              <View style={styles.sectionHeader}>
+                <Ionicons name="sparkles" size={20} color={Colors.primary} />
+                <Text style={styles.sectionTitle}>Summary</Text>
+              </View>
+              <Text style={styles.summaryText}>{document.summary}</Text>
+            </View>
+            <View style={styles.divider} />
+          </>
+        )}
 
         {/* Key Details Section (if metadata exists) */}
         {document.metadata && Object.keys(document.metadata).length > 0 && (
@@ -262,10 +404,14 @@ export default function DocumentDetailScreen() {
               style={styles.sectionHeader}
               onPress={() => setIsTextExpanded(!isTextExpanded)}
             >
-              <Ionicons name="document-text-outline" size={20} color={Colors.text} />
+              <Ionicons
+                name="document-text-outline"
+                size={20}
+                color={Colors.text}
+              />
               <Text style={styles.sectionTitle}>Extracted Text</Text>
               <Ionicons
-                name={isTextExpanded ? 'chevron-up' : 'chevron-down'}
+                name={isTextExpanded ? "chevron-up" : "chevron-down"}
                 size={20}
                 color={Colors.textSecondary}
                 style={styles.expandIcon}
@@ -293,12 +439,14 @@ export default function DocumentDetailScreen() {
           onPress={handleToggleSensitive}
         >
           <Ionicons
-            name={document.isSensitive ? 'lock-open-outline' : 'lock-closed-outline'}
+            name={
+              document.isSensitive ? "lock-open-outline" : "lock-closed-outline"
+            }
             size={20}
             color={Colors.text}
           />
           <Text style={styles.actionButtonSecondaryText}>
-            {document.isSensitive ? 'Unmark' : 'Mark Sensitive'}
+            {document.isSensitive ? "Unmark" : "Mark Sensitive"}
           </Text>
         </TouchableOpacity>
 
@@ -320,9 +468,9 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.background,
   },
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.sm,
     borderBottomWidth: 1,
@@ -332,25 +480,35 @@ const styles = StyleSheet.create({
     padding: Spacing.sm,
   },
   headerActions: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: Spacing.sm,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    gap: Spacing.md,
+  },
+  loadingText: {
+    fontSize: Typography.sizes.base,
+    color: Colors.textSecondary,
   },
   scrollView: {
     flex: 1,
   },
   imageContainer: {
     backgroundColor: Colors.backgroundSecondary,
-    position: 'relative',
+    position: "relative",
   },
   image: {
-    width: '100%',
+    width: "100%",
   },
   sensitiveBadge: {
-    position: 'absolute',
+    position: "absolute",
     top: Spacing.md,
     right: Spacing.md,
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     backgroundColor: Colors.error,
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.sm,
@@ -370,15 +528,15 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.md,
   },
   title: {
-    fontSize: Typography.sizes['2xl'],
+    fontSize: Typography.sizes["2xl"],
     fontWeight: Typography.weights.bold,
     color: Colors.text,
     marginBottom: Spacing.md,
-    lineHeight: Typography.lineHeights.tight * Typography.sizes['2xl'],
+    lineHeight: Typography.lineHeights.tight * Typography.sizes["2xl"],
   },
   metaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     marginBottom: Spacing.sm,
     gap: Spacing.sm,
   },
@@ -387,8 +545,8 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
   },
   tagsContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexDirection: "row",
+    flexWrap: "wrap",
     gap: Spacing.sm,
     marginTop: Spacing.sm,
   },
@@ -408,8 +566,8 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.divider,
   },
   sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     marginBottom: Spacing.md,
     gap: Spacing.sm,
   },
@@ -420,7 +578,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   expandIcon: {
-    marginLeft: 'auto',
+    marginLeft: "auto",
   },
   summaryText: {
     fontSize: Typography.sizes.base,
@@ -431,8 +589,8 @@ const styles = StyleSheet.create({
     gap: Spacing.md,
   },
   detailRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
+    flexDirection: "row",
+    alignItems: "flex-start",
   },
   detailLabel: {
     fontSize: Typography.sizes.base,
@@ -455,13 +613,13 @@ const styles = StyleSheet.create({
     fontSize: Typography.sizes.sm,
     color: Colors.text,
     lineHeight: Typography.lineHeights.relaxed * Typography.sizes.sm,
-    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+    fontFamily: Platform.OS === "ios" ? "Courier" : "monospace",
   },
   bottomPadding: {
-    height: 100, // Space for fixed action buttons
+    height: 100,
   },
   actionsContainer: {
-    flexDirection: 'row',
+    flexDirection: "row",
     paddingHorizontal: Spacing.screenPadding,
     paddingVertical: Spacing.md,
     backgroundColor: Colors.background,
@@ -472,9 +630,9 @@ const styles = StyleSheet.create({
   },
   actionButton: {
     flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
     paddingVertical: Spacing.md,
     borderRadius: BorderRadius.lg,
     gap: Spacing.sm,
@@ -501,11 +659,24 @@ const styles = StyleSheet.create({
   },
   errorContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
+    gap: Spacing.md,
   },
   errorText: {
     fontSize: Typography.sizes.lg,
     color: Colors.textSecondary,
+  },
+  errorButton: {
+    backgroundColor: Colors.primary,
+    paddingHorizontal: Spacing.xl,
+    paddingVertical: Spacing.md,
+    borderRadius: BorderRadius.lg,
+    marginTop: Spacing.md,
+  },
+  errorButtonText: {
+    fontSize: Typography.sizes.base,
+    fontWeight: Typography.weights.semibold,
+    color: Colors.background,
   },
 });

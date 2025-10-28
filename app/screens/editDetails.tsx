@@ -1,139 +1,208 @@
 /**
  * Edit Details Screen - UPDATED VERSION
- * 
+ *
  * Handles TWO modes:
  * 1. NEW document - from camera/file picker
  * 2. EDIT existing - from document detail screen
- * 
- * USAGE:
- * NEW: router.push({ pathname: '/screens/editDetails', params: { imageUri: uri } })
- * EDIT: router.push({ pathname: '/screens/editDetails', params: { imageUri, documentId, isEditing: 'true' } })
  */
 
-import React, { useState, useEffect } from 'react';
+import CategoryChip from "@/components/CategoryChip";
+import { CATEGORIES, CategoryType } from "@/constants/categories";
+import { BorderRadius, Colors, Spacing, Typography } from "@/constants/theme";
+import { useAuth } from "@/context/AuthContext";
+import { Ionicons } from "@expo/vector-icons";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import React, { useEffect, useState } from "react";
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from '@/config/firebase';
+
 import {
-  View,
-  Text,
-  StyleSheet,
+  ActivityIndicator,
+  Alert,
+  Image,
+  Platform,
   ScrollView,
+  StyleSheet,
+  Text,
   TextInput,
   TouchableOpacity,
-  Image,
-  Alert,
-  ActivityIndicator,
-  Platform,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
-import { useRouter, useLocalSearchParams } from 'expo-router';
-import { Colors, Typography, Spacing, BorderRadius } from '@/constants/theme';
-import { CATEGORIES, CategoryType } from '@/constants/categories';
-import { DUMMY_DOCUMENTS } from '@/constants/dummyData';
-import CategoryChip from '@/components/CategoryChip';
+  View,
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { createDocument, updateDocument } from "../services/documentService";
+import { DocumentInput } from "../types/document";
 
 export default function EditDetailsScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
-  
+  const { user } = useAuth();
+
   const imageUri = params.imageUri as string;
   const documentId = params.documentId as string;
-  const isEditing = params.isEditing === 'true'; // Check if editing existing doc
+  const isEditing = params.isEditing === "true"; // Check if editing existing doc
 
   // State
   const [isProcessing, setIsProcessing] = useState(false);
-  const [title, setTitle] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState<CategoryType>('receipt');
+  const [title, setTitle] = useState("");
+  const [selectedCategory, setSelectedCategory] =
+    useState<CategoryType>("receipt");
   const [tags, setTags] = useState<string[]>([]);
-  const [newTag, setNewTag] = useState('');
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
-  const [expiryDate, setExpiryDate] = useState('');
-  const [notes, setNotes] = useState('');
+  const [newTag, setNewTag] = useState("");
+  const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
+  const [expiryDate, setExpiryDate] = useState("");
+  const [notes, setNotes] = useState("");
   const [showCategoryPicker, setShowCategoryPicker] = useState(false);
 
   // Load existing document data if editing
   useEffect(() => {
     if (isEditing && documentId) {
-      const doc = DUMMY_DOCUMENTS.find(d => d.id === documentId);
-      if (doc) {
-        setTitle(doc.title);
-        setSelectedCategory(doc.category);
-        setTags(doc.tags);
-        setDate(new Date(doc.dateAdded).toISOString().split('T')[0]);
-        setExpiryDate(doc.expiryDate ? new Date(doc.expiryDate).toISOString().split('T')[0] : '');
-        setNotes(''); // Notes not in dummy data, but you'd load it here
-      }
+      loadDocument();
     } else {
       // For NEW documents, simulate OCR auto-fill after a brief delay
       setTimeout(() => {
-        setTitle('Samsung Refrigerator Receipt');
-        setSelectedCategory('receipt');
-        setTags(['appliance', 'kitchen', 'best buy']);
+        setTitle("Samsung Refrigerator Receipt");
+        setSelectedCategory("receipt");
+        setTags(["appliance", "kitchen", "best buy"]);
       }, 800);
     }
   }, [isEditing, documentId]);
+
+  const loadDocument = async () => {
+    if (!documentId) return;
+
+    try {
+      console.log("📖 [EditDetails] Loading document:", documentId);
+
+      const docRef = doc(db, "documents", documentId);
+      const docSnap = await getDoc(docRef);
+
+      if (docSnap.exists()) {
+        const docData = docSnap.data();
+        console.log("✅ [EditDetails] Document loaded:", docData);
+
+        setTitle(docData.title || "");
+        setSelectedCategory(docData.category || "receipt");
+        setTags(docData.tags || []);
+        setDate(
+          docData.dateDocument
+            ? new Date(docData.dateDocument).toISOString().split("T")[0]
+            : new Date().toISOString().split("T")[0]
+        );
+        setExpiryDate(
+          docData.expiryDate
+            ? new Date(docData.expiryDate).toISOString().split("T")[0]
+            : ""
+        );
+        // setNotes(docData.notes || '');  // If you add notes field
+      } else {
+        console.error("❌ [EditDetails] Document not found");
+        Alert.alert("Error", "Document not found");
+        router.back();
+      }
+    } catch (error) {
+      console.error("❌ [EditDetails] Failed to load document:", error);
+      Alert.alert("Error", "Failed to load document");
+    }
+  };
 
   // Handle adding a tag
   const handleAddTag = () => {
     const trimmedTag = newTag.trim().toLowerCase();
     if (trimmedTag && !tags.includes(trimmedTag)) {
       setTags([...tags, trimmedTag]);
-      setNewTag('');
+      setNewTag("");
     }
   };
 
   // Handle removing a tag
   const handleRemoveTag = (tagToRemove: string) => {
-    setTags(tags.filter(tag => tag !== tagToRemove));
+    setTags(tags.filter((tag) => tag !== tagToRemove));
   };
 
-  // Handle save
   const handleSave = async () => {
-    // Validate
+    console.log("💾 [EditDetails] Starting save...");
+
+    // VALIDATION
     if (!title.trim()) {
-      Alert.alert('Error', 'Please enter a document title');
+      Alert.alert("Error", "Please enter a document title");
+      return;
+    }
+
+    if (!user) {
+      Alert.alert("Error", "You must be logged in to save documents");
       return;
     }
 
     setIsProcessing(true);
 
-    // Simulate API call
-    setTimeout(() => {
-      setIsProcessing(false);
-      
-      // Show success message
+    try {
+      // prepare doc
+      const documentData: DocumentInput = {
+        userId: user.uid,
+        title: title.trim(),
+        category: selectedCategory,
+        tags: tags,
+        imageUrl: imageUri, // Already uploaded to Firebase Storage
+        dateDocument: date || null,
+        expiryDate: expiryDate || null,
+        isSensitive: false,
+      };
+
+      console.log("💾 [EditDetails] Document data:", documentData);
+
+      // save/update firestore doc
+      if (isEditing) {
+        // update existing doc
+        console.log("💾 [EditDetails] Updating existing document:", documentId);
+        await updateDocument(documentId, documentData);
+      } else {
+        // create new doc
+        console.log("💾 [EditDetails] Creating new document...");
+        const newDocId = await createDocument(documentData);
+        console.log("✅ [EditDetails] Document created with ID:", newDocId);
+      }
+
+      // sucess
       Alert.alert(
-        'Success!',
-        isEditing ? 'Document updated successfully' : 'Document saved successfully',
+        "Success!",
+        isEditing
+          ? "Document updated successfully"
+          : "Document saved successfully",
         [
           {
-            text: 'OK',
+            text: "OK",
             onPress: () => {
-              // Navigate back to home
-              router.push('/(tabs)');
+              console.log("💾 [EditDetails] Navigating back to home...");
+              router.push("/(tabs)"); // Go back to home (will trigger reload!)
             },
           },
         ]
       );
-    }, 1500);
+    } catch (error: any) {
+      console.error("❌ [EditDetails] Save failed:", error);
+      Alert.alert("Error", "Failed to save document. Please try again.");
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   // Handle cancel
   const handleCancel = () => {
     Alert.alert(
-      'Discard Changes?',
-      isEditing 
-        ? 'Are you sure you want to cancel? Your changes will not be saved.'
-        : 'Are you sure you want to cancel? Your document will not be saved.',
+      "Discard Changes?",
+      isEditing
+        ? "Are you sure you want to cancel? Your changes will not be saved."
+        : "Are you sure you want to cancel? Your document will not be saved.",
       [
-        { text: 'Continue Editing', style: 'cancel' },
+        { text: "Continue Editing", style: "cancel" },
         {
-          text: 'Discard',
-          style: 'destructive',
+          text: "Discard",
+          style: "destructive",
           onPress: () => {
             if (isEditing) {
               router.back(); // Go back to document detail
             } else {
-              router.push('/(tabs)'); // Go to home
+              router.push("/(tabs)"); // Go to home
             }
           },
         },
@@ -142,17 +211,17 @@ export default function EditDetailsScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+    <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={handleCancel} style={styles.headerButton}>
           <Text style={styles.cancelText}>Cancel</Text>
         </TouchableOpacity>
         <Text style={styles.headerTitle}>
-          {isEditing ? 'Edit Document' : 'Document Details'}
+          {isEditing ? "Edit Document" : "Document Details"}
         </Text>
-        <TouchableOpacity 
-          onPress={handleSave} 
+        <TouchableOpacity
+          onPress={handleSave}
           style={styles.headerButton}
           disabled={isProcessing}
         >
@@ -164,7 +233,7 @@ export default function EditDetailsScreen() {
         </TouchableOpacity>
       </View>
 
-      <ScrollView 
+      <ScrollView
         style={styles.scrollView}
         showsVerticalScrollIndicator={false}
       >
@@ -201,7 +270,7 @@ export default function EditDetailsScreen() {
           >
             <CategoryChip category={selectedCategory} size="medium" />
             <Ionicons
-              name={showCategoryPicker ? 'chevron-up' : 'chevron-down'}
+              name={showCategoryPicker ? "chevron-up" : "chevron-down"}
               size={20}
               color={Colors.textSecondary}
             />
@@ -215,7 +284,8 @@ export default function EditDetailsScreen() {
                   key={category.id}
                   style={[
                     styles.categoryOption,
-                    selectedCategory === category.id && styles.categoryOptionSelected,
+                    selectedCategory === category.id &&
+                      styles.categoryOptionSelected,
                   ]}
                   onPress={() => {
                     setSelectedCategory(category.id);
@@ -234,7 +304,8 @@ export default function EditDetailsScreen() {
                   <Text
                     style={[
                       styles.categoryOptionText,
-                      selectedCategory === category.id && styles.categoryOptionTextSelected,
+                      selectedCategory === category.id &&
+                        styles.categoryOptionTextSelected,
                     ]}
                   >
                     {category.label}
@@ -248,7 +319,7 @@ export default function EditDetailsScreen() {
         {/* Tags Input */}
         <View style={styles.section}>
           <Text style={styles.sectionLabel}>Tags</Text>
-          
+
           {/* Existing Tags */}
           <View style={styles.tagsContainer}>
             {tags.map((tag, index) => (
@@ -258,7 +329,11 @@ export default function EditDetailsScreen() {
                   onPress={() => handleRemoveTag(tag)}
                   hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 >
-                  <Ionicons name="close-circle" size={16} color={Colors.textSecondary} />
+                  <Ionicons
+                    name="close-circle"
+                    size={16}
+                    color={Colors.textSecondary}
+                  />
                 </TouchableOpacity>
               </View>
             ))}
@@ -293,7 +368,9 @@ export default function EditDetailsScreen() {
             placeholder="YYYY-MM-DD"
             placeholderTextColor={Colors.textLight}
           />
-          <Text style={styles.helperText}>Date document was created or received</Text>
+          <Text style={styles.helperText}>
+            Date document was created or received
+          </Text>
         </View>
 
         {/* Expiry Date Input */}
@@ -339,9 +416,9 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.background,
   },
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.sm,
     borderBottomWidth: 1,
@@ -350,7 +427,7 @@ const styles = StyleSheet.create({
   headerButton: {
     minWidth: 60,
     height: 40,
-    justifyContent: 'center',
+    justifyContent: "center",
   },
   cancelText: {
     fontSize: Typography.sizes.base,
@@ -365,7 +442,7 @@ const styles = StyleSheet.create({
     fontSize: Typography.sizes.base,
     fontWeight: Typography.weights.semibold,
     color: Colors.primary,
-    textAlign: 'right',
+    textAlign: "right",
   },
   scrollView: {
     flex: 1,
@@ -384,7 +461,7 @@ const styles = StyleSheet.create({
     color: Colors.error,
   },
   thumbnail: {
-    width: '100%',
+    width: "100%",
     height: 200,
     borderRadius: BorderRadius.lg,
     backgroundColor: Colors.backgroundSecondary,
@@ -409,9 +486,9 @@ const styles = StyleSheet.create({
     marginTop: Spacing.xs,
   },
   categoryButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     backgroundColor: Colors.backgroundSecondary,
     borderRadius: BorderRadius.lg,
     padding: Spacing.md,
@@ -419,15 +496,15 @@ const styles = StyleSheet.create({
     borderColor: Colors.border,
   },
   categoryGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexDirection: "row",
+    flexWrap: "wrap",
     gap: Spacing.sm,
     marginTop: Spacing.md,
   },
   categoryOption: {
-    width: '48%',
-    flexDirection: 'row',
-    alignItems: 'center',
+    width: "48%",
+    flexDirection: "row",
+    alignItems: "center",
     backgroundColor: Colors.backgroundSecondary,
     padding: Spacing.md,
     borderRadius: BorderRadius.lg,
@@ -436,7 +513,7 @@ const styles = StyleSheet.create({
     borderColor: Colors.border,
   },
   categoryOptionSelected: {
-    backgroundColor: Colors.primaryLight + '20',
+    backgroundColor: Colors.primaryLight + "20",
     borderColor: Colors.primary,
   },
   categoryOptionText: {
@@ -448,14 +525,14 @@ const styles = StyleSheet.create({
     color: Colors.primary,
   },
   tagsContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexDirection: "row",
+    flexWrap: "wrap",
     gap: Spacing.sm,
     marginBottom: Spacing.sm,
   },
   tag: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     backgroundColor: Colors.backgroundSecondary,
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.sm,
@@ -468,12 +545,12 @@ const styles = StyleSheet.create({
     fontWeight: Typography.weights.medium,
   },
   tagInputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     backgroundColor: Colors.backgroundSecondary,
     borderRadius: BorderRadius.lg,
     paddingHorizontal: Spacing.md,
-    paddingVertical: Platform.OS === 'ios' ? Spacing.sm : 0,
+    paddingVertical: Platform.OS === "ios" ? Spacing.sm : 0,
     borderWidth: 1,
     borderColor: Colors.border,
   },
