@@ -30,7 +30,7 @@ yarn-error.*
 .DS_Store
 *.pem
 
-# local env files
+# local env les
 .env*.local
 
 # typescript
@@ -41,3 +41,6 @@ app-example
 # generated native folders
 /ios
 /android
+
+#firebase
+firebase.ts
