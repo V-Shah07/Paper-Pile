@@ -48,7 +48,13 @@ export default function EditDetailsScreen() {
     useState<CategoryType>("receipt");
   const [tags, setTags] = useState<string[]>([]);
   const [newTag, setNewTag] = useState("");
-  const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
+  const [date, setDate] = useState(() => {
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, "0");
+    const day = String(today.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  });
   const [expiryDate, setExpiryDate] = useState("");
   const [notes, setNotes] = useState("");
   const [showCategoryPicker, setShowCategoryPicker] = useState(false);

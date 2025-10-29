@@ -2,15 +2,14 @@
  * Document Detail Screen - FIXED VERSION
  *
  * Now loads documents from Firestore instead of dummy data
+ * ✅ FIXED: Date timezone bug - dates now display correctly
  */
 
-import { db, storage } from "@/config/firebase";
+import { db } from "@/config/firebase";
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { deleteDoc, doc, getDoc } from "firebase/firestore";
-import { deleteObject, ref } from "firebase/storage";
+import { doc, getDoc } from "firebase/firestore";
 import React, { useEffect, useState } from "react";
-import { deleteDocument } from '../services/documentService';
 import {
   ActivityIndicator,
   Alert,
@@ -23,6 +22,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { deleteDocument } from "../services/documentService";
 
 // Import components
 import CategoryChip from "@/components/CategoryChip";
@@ -90,12 +90,31 @@ export default function DocumentDetailScreen() {
     }
   };
 
-  // Format date helper
+  // Format date helper - FIXED to handle multiple date formats
   const formatDate = (dateInput: string | Date | null): string => {
     if (!dateInput) return "N/A";
 
-    const date =
-      typeof dateInput === "string" ? new Date(dateInput) : dateInput;
+    let date: Date;
+    
+    if (typeof dateInput === "string") {
+      // Check if it's an ISO timestamp (has 'T' in it)
+      if (dateInput.includes('T')) {
+        // ISO format like "2025-10-29T17:01:30.144Z" - use standard parsing
+        date = new Date(dateInput);
+      } else {
+        // Simple YYYY-MM-DD format - parse without timezone conversion
+        const [year, month, day] = dateInput.split("-").map(Number);
+        date = new Date(year, month - 1, day); // month is 0-indexed in JS
+      }
+    } else {
+      date = dateInput;
+    }
+    
+    // Check if date is valid
+    if (isNaN(date.getTime())) {
+      return "Invalid date";
+    }
+    
     return date.toLocaleDateString("en-US", {
       month: "long",
       day: "numeric",
@@ -127,42 +146,48 @@ export default function DocumentDetailScreen() {
 
   const handleDelete = () => {
     if (!document) {
-      Alert.alert('Error', 'Document not found');
+      Alert.alert("Error", "Document not found");
       return;
     }
-  
+
     Alert.alert(
-      'Delete Document',
-      'Are you sure you want to delete this document? This action cannot be undone.',
+      "Delete Document",
+      "Are you sure you want to delete this document? This action cannot be undone.",
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: "Cancel", style: "cancel" },
         {
-          text: 'Delete',
-          style: 'destructive',
+          text: "Delete",
+          style: "destructive",
           onPress: async () => {
             if (!document) return; // Double check
-  
+
             try {
-              console.log('🗑️ [DocumentDetail] Deleting document:', document.id);
-              
+              console.log(
+                "🗑️ [DocumentDetail] Deleting document:",
+                document.id
+              );
+
               // Delete from Firestore
               await deleteDocument(document.id);
-              
-              console.log('✅ [DocumentDetail] Document deleted successfully');
-              
+
+              console.log("✅ [DocumentDetail] Document deleted successfully");
+
               // Show success message
-              Alert.alert('Deleted', 'Document deleted successfully', [
+              Alert.alert("Deleted", "Document deleted successfully", [
                 {
-                  text: 'OK',
+                  text: "OK",
                   onPress: () => {
                     // Navigate back to home
-                    router.push('/(tabs)');
-                  }
-                }
+                    router.push("/(tabs)");
+                  },
+                },
               ]);
             } catch (error) {
-              console.error('❌ [DocumentDetail] Delete failed:', error);
-              Alert.alert('Error', 'Could not delete document. Please try again.');
+              console.error("❌ [DocumentDetail] Delete failed:", error);
+              Alert.alert(
+                "Error",
+                "Could not delete document. Please try again."
+              );
             }
           },
         },
@@ -312,12 +337,12 @@ export default function DocumentDetailScreen() {
           {document.dateDocument && (
             <View style={styles.metaRow}>
               <Ionicons
-                name="calendar-outline"
+                name="document-outline"
                 size={16}
                 color={Colors.textSecondary}
               />
               <Text style={styles.metaText}>
-                Document Date: {formatDate(document.dateDocument)}
+                Document date: {formatDate(document.dateDocument)}
               </Text>
             </View>
           )}
@@ -336,8 +361,22 @@ export default function DocumentDetailScreen() {
             </View>
           )}
 
+          {/* Uploaded By (if exists) */}
+          {document.uploadedBy && (
+            <View style={styles.metaRow}>
+              <Ionicons
+                name="person-outline"
+                size={16}
+                color={Colors.textSecondary}
+              />
+              <Text style={styles.metaText}>
+                Uploaded by {document.uploadedBy}
+              </Text>
+            </View>
+          )}
+
           {/* Tags */}
-          {document.tags.length > 0 && (
+          {document.tags && document.tags.length > 0 && (
             <View style={styles.tagsContainer}>
               {document.tags.map((tag, index) => (
                 <View key={index} style={styles.tag}>
