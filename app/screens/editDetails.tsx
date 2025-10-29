@@ -7,19 +7,19 @@
  */
 
 import CategoryChip from "@/components/CategoryChip";
+import { db } from "@/config/firebase";
 import { CATEGORIES, CategoryType } from "@/constants/categories";
 import { BorderRadius, Colors, Spacing, Typography } from "@/constants/theme";
 import { useAuth } from "@/context/AuthContext";
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
+import { doc, getDoc } from "firebase/firestore";
 import React, { useEffect, useState } from "react";
-import { doc, getDoc } from 'firebase/firestore';
-import { db } from '@/config/firebase';
 
+import { Image } from "expo-image";
 import {
   ActivityIndicator,
   Alert,
-  Image,
   Platform,
   ScrollView,
   StyleSheet,
@@ -243,7 +243,7 @@ export default function EditDetailsScreen() {
           <Image
             source={{ uri: imageUri }}
             style={styles.thumbnail}
-            resizeMode="cover"
+            contentFit="cover"
           />
         </View>
 

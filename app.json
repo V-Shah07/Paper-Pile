@@ -12,7 +12,16 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.vshah0777.PaperPile",
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "NSAppTransportSecurity": {
+          "NSAllowsArbitraryLoads": true,
+          "NSExceptionDomains": {
+            "firebasestorage.googleapis.com": {
+              "NSExceptionAllowsInsecureHTTPLoads": true,
+              "NSIncludesSubdomains": true,
+              "NSExceptionRequiresForwardSecrecy": false
+            }
+          }
+        }
       }
     },
     "android": {

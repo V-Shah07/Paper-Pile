@@ -7,8 +7,9 @@
 
 import { Colors } from "@/constants/theme";
 import { Ionicons } from "@expo/vector-icons";
+import { Image } from "expo-image";
 import React from "react";
-import { Image, Text, TouchableOpacity, View } from "react-native";
+import { Text, TouchableOpacity, View } from "react-native";
 import { Document } from "../app/types/document";
 import CategoryChip from "./CategoryChip";
 import { styles } from "./DocumentCard.styles";
@@ -54,18 +55,14 @@ export default function DocumentCard({ document, onPress }: DocumentCardProps) {
       activeOpacity={0.7} // Slight fade when pressed
     >
       {/* Thumbnail Image */}
-      {document.thumbnailUrl || document.imageUrl ? (
+      {document.imageUrl ? (
         <Image
-          source={{ uri: document.thumbnailUrl || document.imageUrl }}
+          source={{ uri: document.imageUrl }} // ← expo-image takes string directly
           style={styles.thumbnail}
-          resizeMode="cover"
+          contentFit="cover"
+          transition={200}
           onError={(error) => {
-            console.error("❌ Image failed to load");
-            console.error("❌ Error details:", error.nativeEvent);
-            console.error(
-              "❌ Tried URL:",
-              document.thumbnailUrl || document.imageUrl
-            );
+            console.error("❌ expo-image failed:", error);
           }}
         />
       ) : (
