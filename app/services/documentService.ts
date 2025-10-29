@@ -121,18 +121,17 @@ import {
    * 
    * @param documentId - Document to delete
    */
-  export const deleteDocument = async (
-    documentId: string
-  ): Promise<void> => {
+  export const deleteDocument = async (documentId: string): Promise<void> => {
     try {
-      console.log('🗑️  [Firestore] Deleting document:', documentId);
+      console.log('🗑️ [Firestore] Deleting document:', documentId);
       
-      const docRef = doc(db, 'documents', documentId);
-      await deleteDoc(docRef);
+      await deleteDoc(doc(db, 'documents', documentId));
       
-      console.log('✅ [Firestore] Delete complete');
+      console.log('✅ [Firestore] Document deleted successfully');
     } catch (error) {
       console.error('❌ [Firestore] Delete failed:', error);
-      throw new Error('Failed to delete document.');
+      throw error;
     }
   };
+
+  

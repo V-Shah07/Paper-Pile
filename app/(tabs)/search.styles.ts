@@ -1,5 +1,5 @@
+import { BorderRadius, Colors, Spacing, Typography } from '../../constants/theme';
 import { StyleSheet } from 'react-native';
-import { Colors, Typography, Spacing, BorderRadius } from '@/constants/theme';
 
 export const styles = StyleSheet.create({
   container: {
@@ -119,5 +119,16 @@ export const styles = StyleSheet.create({
   resultsList: {
     paddingHorizontal: Spacing.screenPadding,
     paddingBottom: Spacing.xl,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: Spacing['3xl'],
+  },
+  loadingText: {
+    fontSize: Typography.sizes.base,
+    color: Colors.textSecondary,
+    marginTop: Spacing.md,
   },
 });

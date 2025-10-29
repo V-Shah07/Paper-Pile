@@ -10,6 +10,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { deleteDoc, doc, getDoc } from "firebase/firestore";
 import { deleteObject, ref } from "firebase/storage";
 import React, { useEffect, useState } from "react";
+import { deleteDocument } from '../services/documentService';
 import {
   ActivityIndicator,
   Alert,
@@ -125,56 +126,43 @@ export default function DocumentDetailScreen() {
   };
 
   const handleDelete = () => {
-    if (!document) return;
-
+    if (!document) {
+      Alert.alert('Error', 'Document not found');
+      return;
+    }
+  
     Alert.alert(
-      "Delete Document",
-      "Are you sure you want to delete this document? This action cannot be undone.",
+      'Delete Document',
+      'Are you sure you want to delete this document? This action cannot be undone.',
       [
-        { text: "Cancel", style: "cancel" },
+        { text: 'Cancel', style: 'cancel' },
         {
-          text: "Delete",
-          style: "destructive",
+          text: 'Delete',
+          style: 'destructive',
           onPress: async () => {
+            if (!document) return; // Double check
+  
             try {
-              console.log(
-                "🗑️ [DocumentDetail] Deleting document:",
-                document.id
-              );
-
+              console.log('🗑️ [DocumentDetail] Deleting document:', document.id);
+              
               // Delete from Firestore
-              await deleteDoc(doc(db, "documents", document.id));
-              console.log(
-                "✅ [DocumentDetail] Document deleted from Firestore"
-              );
-
-              // Optionally delete image from Storage
-              if (document.imageUrl && user) {
-                try {
-                  const imageRef = ref(
-                    storage,
-                    `documents/${user.uid}/${document.id}/original.jpg`
-                  );
-                  await deleteObject(imageRef);
-                  console.log("✅ [DocumentDetail] Image deleted from Storage");
-                } catch (storageError) {
-                  console.warn(
-                    "⚠️ [DocumentDetail] Failed to delete image from Storage:",
-                    storageError
-                  );
-                  // Continue anyway - document is deleted from Firestore
+              await deleteDocument(document.id);
+              
+              console.log('✅ [DocumentDetail] Document deleted successfully');
+              
+              // Show success message
+              Alert.alert('Deleted', 'Document deleted successfully', [
+                {
+                  text: 'OK',
+                  onPress: () => {
+                    // Navigate back to home
+                    router.push('/(tabs)');
+                  }
                 }
-              }
-
-              Alert.alert("Success", "Document deleted successfully", [
-                { text: "OK", onPress: () => router.push("/(tabs)") },
               ]);
             } catch (error) {
-              console.error("❌ [DocumentDetail] Delete failed:", error);
-              Alert.alert(
-                "Error",
-                "Failed to delete document. Please try again."
-              );
+              console.error('❌ [DocumentDetail] Delete failed:', error);
+              Alert.alert('Error', 'Could not delete document. Please try again.');
             }
           },
         },
