@@ -241,7 +241,7 @@ export default function EditDetailsScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionLabel}>Preview</Text>
           <Image
-            source={{ uri: imageUri }}
+            source={{ uri: imageUri }} // ← Already base64!
             style={styles.thumbnail}
             contentFit="cover"
           />

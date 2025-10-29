@@ -1,14 +1,7 @@
-/**
- * DocumentCard Component
- *
- * A card that displays a document with thumbnail, title, category, and metadata.
- * Used in document lists throughout the app.
- */
-
 import { Colors } from "@/constants/theme";
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
-import React from "react";
+import React, { useState } from "react";
 import { Text, TouchableOpacity, View } from "react-native";
 import { Document } from "../app/types/document";
 import CategoryChip from "./CategoryChip";
@@ -16,16 +9,13 @@ import { styles } from "./DocumentCard.styles";
 
 interface DocumentCardProps {
   document: Document;
-  onPress: () => void; // Function to call when card is tapped
+  onPress: () => void;
 }
 
 export default function DocumentCard({ document, onPress }: DocumentCardProps) {
-  console.log("🃏 [DocumentCard] Rendering document:", {
-    id: document.id,
-    title: document.title,
-    imageUrl: document.imageUrl,
-    thumbnailUrl: document.thumbnailUrl,
-  });
+  const [imageSource, setImageSource] = useState<string | null>(null);
+  const [imageLoading, setImageLoading] = useState(true);
+  const [imageError, setImageError] = useState(false);
 
   // Format date for display
   const formatDate = (isoDate: string): string => {
@@ -49,30 +39,22 @@ export default function DocumentCard({ document, onPress }: DocumentCardProps) {
   };
 
   return (
-    <TouchableOpacity
-      style={styles.card}
-      onPress={onPress}
-      activeOpacity={0.7} // Slight fade when pressed
-    >
+    <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.7}>
       {/* Thumbnail Image */}
       {document.imageUrl ? (
         <Image
-          source={{ uri: document.imageUrl }} // ← expo-image takes string directly
+          source={{ uri: document.imageUrl }} // ← Already base64!
           style={styles.thumbnail}
           contentFit="cover"
-          transition={200}
-          onError={(error) => {
-            console.error("❌ expo-image failed:", error);
-          }}
         />
       ) : (
         <View
           style={[
             styles.thumbnail,
             {
-              backgroundColor: Colors.backgroundSecondary,
               justifyContent: "center",
               alignItems: "center",
+              backgroundColor: Colors.backgroundSecondary,
             },
           ]}
         >
@@ -138,7 +120,7 @@ export default function DocumentCard({ document, onPress }: DocumentCardProps) {
         </View>
       </View>
 
-      {/* Chevron Icon (indicates card is tappable) */}
+      {/* Chevron Icon */}
       <Ionicons
         name="chevron-forward"
         size={20}

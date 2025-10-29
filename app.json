@@ -10,15 +10,22 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.vshah0777.PaperPile",
+      "bundleIdentifier": "com.yourcompany.paperpile",
       "infoPlist": {
         "NSAppTransportSecurity": {
-          "NSAllowsArbitraryLoads": true,
+          "NSAllowsArbitraryLoads": false,
           "NSExceptionDomains": {
             "firebasestorage.googleapis.com": {
-              "NSExceptionAllowsInsecureHTTPLoads": true,
+              "NSExceptionAllowsInsecureHTTPLoads": false,
+              "NSExceptionRequiresForwardSecrecy": false,
               "NSIncludesSubdomains": true,
-              "NSExceptionRequiresForwardSecrecy": false
+              "NSThirdPartyExceptionAllowsInsecureHTTPLoads": false,
+              "NSThirdPartyExceptionRequiresForwardSecrecy": false
+            },
+            "googleapis.com": {
+              "NSExceptionAllowsInsecureHTTPLoads": false,
+              "NSExceptionRequiresForwardSecrecy": false,
+              "NSIncludesSubdomains": true
             }
           }
         }

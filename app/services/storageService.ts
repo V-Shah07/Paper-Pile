@@ -47,3 +47,68 @@ export const uploadDocumentImage = async (
 export const generateDocumentId = (): string => {
   return `doc_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 };
+
+/**
+ * Download image and convert to base64
+ * This bypasses CORS/ATS issues by fetching through React Native's fetch
+ */
+export const getImageAsBase64 = async (imageUrl: string): Promise<string> => {
+  try {
+    console.log('📥 [Storage] Downloading image as base64...');
+    
+    const response = await fetch(imageUrl);
+    
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+    
+    const blob = await response.blob();
+    
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const base64 = reader.result as string;
+        console.log('✅ [Storage] Converted to base64, length:', base64.length);
+        resolve(base64);
+      };
+      reader.onerror = (error) => {
+        console.error('❌ [Storage] FileReader error:', error);
+        reject(error);
+      };
+      reader.readAsDataURL(blob);
+    });
+  } catch (error) {
+    console.error('❌ [Storage] Failed to convert to base64:', error);
+    throw error;
+  }
+};
+
+/**
+ * Convert local image to base64 (bypass Firebase Storage for iOS)
+ */
+export const convertImageToBase64 = async (uri: string): Promise<string> => {
+  try {
+    console.log('📸 [Storage] Converting local image to base64...');
+    
+    // Read the local file
+    const response = await fetch(uri);
+    const blob = await response.blob();
+    
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const base64 = reader.result as string;
+        console.log('✅ [Storage] Converted to base64, size:', Math.round(base64.length / 1024), 'KB');
+        resolve(base64);
+      };
+      reader.onerror = (error) => {
+        console.error('❌ [Storage] FileReader error:', error);
+        reject(error);
+      };
+      reader.readAsDataURL(blob);
+    });
+  } catch (error) {
+    console.error('❌ [Storage] Base64 conversion failed:', error);
+    throw error;
+  }
+};

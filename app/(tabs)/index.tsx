@@ -7,6 +7,7 @@ import * as ImagePicker from "expo-image-picker"; // You'll need to install this
 import { useRouter } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { getUserDocuments } from "../services/documentService";
+import { convertImageToBase64 } from "../services/storageService";
 import { Document } from "../types/document";
 
 import {
@@ -25,18 +26,15 @@ import EmptyState from "@/components/EmptyState";
 import FloatingActionButton from "@/components/FloatingActionButton";
 import SearchBar from "@/components/SearchBar";
 import UploadModal from "@/components/uploadModal";
-import {
-  generateDocumentId,
-  uploadDocumentImage,
-} from "../services/storageService";
+import { generateDocumentId } from "../services/storageService";
 
 // Import constants
 import { CATEGORIES, CategoryType } from "@/constants/categories";
 import { Colors, Spacing } from "@/constants/theme";
 import { useAuth } from "@/context/AuthContext";
+import { useFocusEffect } from "@react-navigation/native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { styles } from "./index.styles";
-import { useFocusEffect } from "@react-navigation/native";
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -81,7 +79,7 @@ export default function HomeScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      console.log('🔄 [Home] Screen focused, reloading documents...');
+      console.log("🔄 [Home] Screen focused, reloading documents...");
       loadDocuments();
     }, [user])
   );
@@ -133,13 +131,13 @@ export default function HomeScreen() {
   };
 
   // Handle camera selection
+  // Handle camera selection
   const handleSelectCamera = async () => {
     if (!user) {
       Alert.alert("Error", "You must be logged in to upload documents");
       return;
     }
 
-    //Request camera permissions
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
 
     if (status !== "granted") {
@@ -150,47 +148,39 @@ export default function HomeScreen() {
       return;
     }
 
-    // launch camera
     const result = await ImagePicker.launchCameraAsync({
       allowsEditing: true,
-      quality: 1,
+      quality: 0.7, // ← Compress to 70% to keep base64 size down
       aspect: [3, 4],
     });
 
     if (result.canceled) {
-      return; // User cancelled, do nothing
+      return;
     }
 
-    // upload to storage
-    setShowUploadModal(false); // Close the modal
+    setShowUploadModal(false);
 
     try {
-      // Show loading indicator (we'll add this to UI)
-      console.log("📤 Starting upload...");
+      console.log("📤 Converting image to base64...");
 
-      // get unique document id
       const documentId = generateDocumentId();
 
-      // Upload image to Firebase Storage
-      const imageUrl = await uploadDocumentImage(
-        result.assets[0].uri, // Local file path
-        user.uid, // Current user's ID
-        documentId // Unique document ID
-      );
+      // Convert to base64 instead of uploading to Storage
+      const imageBase64 = await convertImageToBase64(result.assets[0].uri);
 
-      console.log("✅ Upload complete! URL:", imageUrl);
+      console.log("✅ Conversion complete!");
 
-      // Navigate to edit details with the Firebase URL
+      // Navigate with base64 image
       router.push({
         pathname: "/screens/editDetails",
         params: {
-          imageUri: imageUrl, // Permanent Firebase URL
-          documentId: documentId, // Pass the ID so editDetails can save
+          imageUri: imageBase64, // ← Now it's base64!
+          documentId: documentId,
         },
       });
     } catch (error) {
-      console.error("Upload failed:", error);
-      Alert.alert("Upload Failed", "Could not upload image. Please try again.");
+      console.error("Conversion failed:", error);
+      Alert.alert("Error", "Could not process image. Please try again.");
     }
   };
 
@@ -201,7 +191,6 @@ export default function HomeScreen() {
       return;
     }
 
-    // STEP 1: Request media library permissions
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
 
     if (status !== "granted") {
@@ -212,49 +201,39 @@ export default function HomeScreen() {
       return;
     }
 
-    // STEP 2: Launch image picker (photo gallery/files)
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
-      quality: 1,
+      quality: 0.7, // ← Compress
       aspect: [3, 4],
     });
 
-    // STEP 3: Check if user selected a photo (didn't cancel)
     if (result.canceled) {
-      return; // User cancelled, do nothing
+      return;
     }
 
-    // STEP 4: Upload to Firebase Storage
-    setShowUploadModal(false); // Close the modal first
+    setShowUploadModal(false);
 
     try {
-      // Show loading indicator
-      console.log("📤 Starting upload...");
+      console.log("📤 Converting image to base64...");
 
-      // Generate unique ID for this document
       const documentId = generateDocumentId();
 
-      // Upload image to Firebase Storage
-      const imageUrl = await uploadDocumentImage(
-        result.assets[0].uri, // Local file: "file:///path/to/image.jpg"
-        user.uid, // Current user's ID
-        documentId // Unique document ID
-      );
+      // Convert to base64
+      const imageBase64 = await convertImageToBase64(result.assets[0].uri);
 
-      console.log("✅ Upload complete! URL:", imageUrl);
+      console.log("✅ Conversion complete!");
 
-      // STEP 5: Navigate to edit details with the Firebase URL
       router.push({
         pathname: "/screens/editDetails",
         params: {
-          imageUri: imageUrl, // Permanent Firebase URL
-          documentId: documentId, // Pass the ID so editDetails can save
+          imageUri: imageBase64, // ← Base64
+          documentId: documentId,
         },
       });
     } catch (error) {
-      console.error("Upload failed:", error);
-      Alert.alert("Upload Failed", "Could not upload image. Please try again.");
+      console.error("Conversion failed:", error);
+      Alert.alert("Error", "Could not process image. Please try again.");
     }
   };
 
