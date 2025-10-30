@@ -2,6 +2,7 @@
  * Home Screen (Documents List) - WITH UPLOAD MODAL INTEGRATED
  */
 
+import { SORT_OPTIONS, SortOptionId } from "@/constants/categories"; // Add this line
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker"; // You'll need to install this
 import { useRouter } from "expo-router";
@@ -14,6 +15,7 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
+  Modal,
   ScrollView,
   Text,
   TouchableOpacity,
@@ -30,7 +32,13 @@ import { generateDocumentId } from "../services/storageService";
 
 // Import constants
 import { CATEGORIES, CategoryType } from "@/constants/categories";
-import { Colors, Spacing } from "@/constants/theme";
+import {
+  BorderRadius,
+  Colors,
+  Shadows,
+  Spacing,
+  Typography,
+} from "@/constants/theme";
 import { useAuth } from "@/context/AuthContext";
 import { useFocusEffect } from "@react-navigation/native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -50,6 +58,9 @@ export default function HomeScreen() {
     CategoryType | "all"
   >("all");
   const [showUploadModal, setShowUploadModal] = useState(false); // NEW STATE
+
+  const [sortBy, setSortBy] = useState<SortOptionId>("add-date-desc"); // NEW
+  const [showFilterModal, setShowFilterModal] = useState(false); // NEW
 
   useEffect(() => {
     loadDocuments();
@@ -91,6 +102,59 @@ export default function HomeScreen() {
     setRefreshing(false);
   };
 
+  // Sort documents
+  const sortDocuments = (docs: Document[]): Document[] => {
+    const sorted = [...docs];
+
+    switch (sortBy) {
+      case "add-date-desc":
+        return sorted.sort(
+          (a, b) =>
+            new Date(b.dateAdded).getTime() - new Date(a.dateAdded).getTime()
+        );
+      case "add-date-asc":
+        return sorted.sort(
+          (a, b) =>
+            new Date(a.dateAdded).getTime() - new Date(b.dateAdded).getTime()
+        );
+      case "doc-date-desc":
+        return sorted.sort((a, b) => {
+          // Handle missing dates - put them at the end
+          if (!a.dateDocument && !b.dateDocument) return 0;
+          if (!a.dateDocument) return 1; // a goes to end
+          if (!b.dateDocument) return -1; // b goes to end
+
+          // Both have dates, compare them
+          return (
+            new Date(b.dateDocument).getTime() -
+            new Date(a.dateDocument).getTime()
+          );
+        });
+      case "doc-date-asc":
+        return sorted.sort((a, b) => {
+          // Handle missing dates - put them at the end
+          if (!a.dateDocument && !b.dateDocument) return 0;
+          if (!a.dateDocument) return 1; // a goes to end
+          if (!b.dateDocument) return -1; // b goes to end
+
+          // Both have dates, compare them
+          return (
+            new Date(a.dateDocument).getTime() -
+            new Date(b.dateDocument).getTime()
+          );
+        });
+
+      case "title-asc":
+        return sorted.sort((a, b) => a.title.localeCompare(b.title));
+      case "title-desc":
+        return sorted.sort((a, b) => b.title.localeCompare(a.title));
+      case "category":
+        return sorted.sort((a, b) => a.category.localeCompare(b.category));
+      default:
+        return sorted;
+    }
+  };
+
   // Filter documents
   const filteredDocuments = useMemo(() => {
     let filtered = documents;
@@ -109,8 +173,8 @@ export default function HomeScreen() {
       );
     }
 
-    return filtered;
-  }, [documents, searchQuery, selectedCategory]);
+    return sortDocuments(filtered);
+  }, [documents, searchQuery, selectedCategory, sortBy]);
 
   // Navigate to search tab
   const handleSearchBarPress = () => {
@@ -246,6 +310,11 @@ export default function HomeScreen() {
       [{ text: "OK" }]
     );
   };
+  // Handle sort selection
+  const handleSortSelect = (sortOption: SortOptionId) => {
+    setSortBy(sortOption);
+    setShowFilterModal(false);
+  };
 
   // Render category chip
   const renderCategoryChip = (
@@ -277,7 +346,7 @@ export default function HomeScreen() {
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Documents</Text>
-        <TouchableOpacity>
+        <TouchableOpacity onPress={() => setShowFilterModal(true)}>
           <Ionicons name="filter" size={24} color={Colors.text} />
         </TouchableOpacity>
       </View>
@@ -362,6 +431,119 @@ export default function HomeScreen() {
         onSelectFiles={handleSelectFiles}
         onSelectEmail={handleSelectEmail}
       />
+
+      <Modal
+        visible={showFilterModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowFilterModal(false)}
+      >
+        <View style={modalStyles.backdrop}>
+          <View style={modalStyles.content}>
+            {/* Header */}
+            <View style={modalStyles.header}>
+              <Text style={modalStyles.title}>Sort By</Text>
+              <TouchableOpacity
+                onPress={() => setShowFilterModal(false)}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <Ionicons name="close" size={24} color={Colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+
+            {/* Sort Options */}
+            {SORT_OPTIONS.map((option) => (
+              <TouchableOpacity
+                key={option.id}
+                style={[
+                  modalStyles.option,
+                  sortBy === option.id && modalStyles.optionSelected,
+                ]}
+                onPress={() => handleSortSelect(option.id)}
+              >
+                <Text
+                  style={[
+                    modalStyles.optionText,
+                    sortBy === option.id && modalStyles.optionTextSelected,
+                  ]}
+                >
+                  {option.label}
+                </Text>
+                {sortBy === option.id && (
+                  <Ionicons name="checkmark" size={24} color={Colors.primary} />
+                )}
+              </TouchableOpacity>
+            ))}
+
+            {/* Cancel Button */}
+            <TouchableOpacity
+              style={modalStyles.cancelButton}
+              onPress={() => setShowFilterModal(false)}
+            >
+              <Text style={modalStyles.cancelText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
+
+const modalStyles = {
+  backdrop: {
+    flex: 1,
+    backgroundColor: Colors.overlay,
+    justifyContent: "flex-end" as const,
+  },
+  content: {
+    backgroundColor: Colors.background,
+    borderTopLeftRadius: BorderRadius["2xl"],
+    borderTopRightRadius: BorderRadius["2xl"],
+    padding: Spacing.screenPadding,
+    paddingBottom: Spacing.xl,
+    ...Shadows.lg,
+  },
+  header: {
+    flexDirection: "row" as const,
+    justifyContent: "space-between" as const,
+    alignItems: "center" as const,
+    marginBottom: Spacing.lg,
+  },
+  title: {
+    fontSize: Typography.sizes.xl,
+    fontWeight: Typography.weights.bold as any,
+    color: Colors.text,
+  },
+  option: {
+    flexDirection: "row" as const,
+    justifyContent: "space-between" as const,
+    alignItems: "center" as const,
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.md,
+    borderRadius: BorderRadius.lg,
+    marginBottom: Spacing.sm,
+  },
+  optionSelected: {
+    backgroundColor: Colors.backgroundSecondary,
+  },
+  optionText: {
+    fontSize: Typography.sizes.base,
+    color: Colors.text,
+  },
+  optionTextSelected: {
+    fontWeight: Typography.weights.semibold as any,
+    color: Colors.primary,
+  },
+  cancelButton: {
+    marginTop: Spacing.md,
+    paddingVertical: Spacing.md,
+    backgroundColor: Colors.backgroundSecondary,
+    borderRadius: BorderRadius.lg,
+    alignItems: "center" as const,
+  },
+  cancelText: {
+    fontSize: Typography.sizes.base,
+    fontWeight: Typography.weights.semibold as any,
+    color: Colors.text,
+  },
+};

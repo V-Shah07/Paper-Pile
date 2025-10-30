@@ -1,9 +1,11 @@
 /**
- * Edit Details Screen - UPDATED VERSION
+ * Edit Details Screen - WITH SENSITIVE TOGGLE
  *
  * Handles TWO modes:
  * 1. NEW document - from camera/file picker
  * 2. EDIT existing - from document detail screen
+ * 
+ * ✅ NEW: Can mark document as sensitive while editing
  */
 
 import CategoryChip from "@/components/CategoryChip";
@@ -27,6 +29,7 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  Switch,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { createDocument, updateDocument } from "../services/documentService";
@@ -39,7 +42,7 @@ export default function EditDetailsScreen() {
 
   const imageUri = params.imageUri as string;
   const documentId = params.documentId as string;
-  const isEditing = params.isEditing === "true"; // Check if editing existing doc
+  const isEditing = params.isEditing === "true";
 
   // State
   const [isProcessing, setIsProcessing] = useState(false);
@@ -58,6 +61,7 @@ export default function EditDetailsScreen() {
   const [expiryDate, setExpiryDate] = useState("");
   const [notes, setNotes] = useState("");
   const [showCategoryPicker, setShowCategoryPicker] = useState(false);
+  const [isSensitive, setIsSensitive] = useState(false); // ✅ NEW: Track sensitive state
 
   // Load existing document data if editing
   useEffect(() => {
@@ -99,7 +103,7 @@ export default function EditDetailsScreen() {
             ? new Date(docData.expiryDate).toISOString().split("T")[0]
             : ""
         );
-        // setNotes(docData.notes || '');  // If you add notes field
+        setIsSensitive(docData.isSensitive || false); // ✅ NEW: Load sensitive state
       } else {
         console.error("❌ [EditDetails] Document not found");
         Alert.alert("Error", "Document not found");
@@ -148,10 +152,10 @@ export default function EditDetailsScreen() {
         title: title.trim(),
         category: selectedCategory,
         tags: tags,
-        imageUrl: imageUri, // Already uploaded to Firebase Storage
+        imageUrl: imageUri,
         dateDocument: date || null,
         expiryDate: expiryDate || null,
-        isSensitive: false,
+        isSensitive: isSensitive, 
       };
 
       console.log("💾 [EditDetails] Document data:", documentData);
@@ -168,7 +172,7 @@ export default function EditDetailsScreen() {
         console.log("✅ [EditDetails] Document created with ID:", newDocId);
       }
 
-      // sucess
+      // success
       Alert.alert(
         "Success!",
         isEditing
@@ -179,7 +183,7 @@ export default function EditDetailsScreen() {
             text: "OK",
             onPress: () => {
               console.log("💾 [EditDetails] Navigating back to home...");
-              router.push("/(tabs)"); // Go back to home (will trigger reload!)
+              router.push("/(tabs)");
             },
           },
         ]
@@ -206,9 +210,9 @@ export default function EditDetailsScreen() {
           style: "destructive",
           onPress: () => {
             if (isEditing) {
-              router.back(); // Go back to document detail
+              router.back();
             } else {
-              router.push("/(tabs)"); // Go to home
+              router.push("/(tabs)");
             }
           },
         },
@@ -247,7 +251,7 @@ export default function EditDetailsScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionLabel}>Preview</Text>
           <Image
-            source={{ uri: imageUri }} // ← Already base64!
+            source={{ uri: imageUri }}
             style={styles.thumbnail}
             contentFit="cover"
           />
@@ -392,6 +396,34 @@ export default function EditDetailsScreen() {
           <Text style={styles.helperText}>
             For warranties, insurance, or time-sensitive documents
           </Text>
+        </View>
+
+        {/* ✅ NEW: Mark as Sensitive Toggle */}
+        <View style={styles.section}>
+          <View style={styles.sensitiveRow}>
+            <View style={styles.sensitiveInfo}>
+              <View style={styles.sensitiveLabelRow}>
+                <Ionicons
+                  name={isSensitive ? "lock-closed" : "lock-open-outline"}
+                  size={20}
+                  color={isSensitive ? Colors.error : Colors.textSecondary}
+                />
+                <Text style={styles.sectionLabel}>Mark as Sensitive</Text>
+              </View>
+              <Text style={styles.helperText}>
+                {isSensitive
+                  ? "Hidden from other family members"
+                  : "Visible to all family members"}
+              </Text>
+            </View>
+            <Switch
+              value={isSensitive}
+              onValueChange={setIsSensitive}
+              trackColor={{ false: Colors.border, true: Colors.error }}
+              thumbColor={Colors.background}
+              ios_backgroundColor={Colors.border}
+            />
+          </View>
         </View>
 
         {/* Notes Input */}
@@ -565,6 +597,27 @@ const styles = StyleSheet.create({
     fontSize: Typography.sizes.base,
     color: Colors.text,
     paddingVertical: Spacing.sm,
+  },
+  // ✅ NEW: Sensitive toggle styles
+  sensitiveRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: Colors.backgroundSecondary,
+    borderRadius: BorderRadius.lg,
+    padding: Spacing.md,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  sensitiveInfo: {
+    flex: 1,
+    marginRight: Spacing.md,
+  },
+  sensitiveLabelRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.sm,
+    marginBottom: Spacing.xs,
   },
   bottomPadding: {
     height: Spacing.xl,

@@ -95,8 +95,10 @@ export const getCategoryLabel = (id: CategoryType): string => {
  * Sort options for document lists
  */
 export const SORT_OPTIONS = [
-  { id: 'date-desc', label: 'Newest First' },
-  { id: 'date-asc', label: 'Oldest First' },
+  { id: 'add-date-desc', label: 'Newest Added First' },
+  { id: 'add-date-asc', label: 'Oldest Added First' },
+  { id: 'doc-date-desc', label: 'Newest Document First' },
+  { id: 'doc-date-asc', label: 'Oldest Document First' },
   { id: 'title-asc', label: 'Title A-Z' },
   { id: 'title-desc', label: 'Title Z-A' },
   { id: 'category', label: 'By Category' },

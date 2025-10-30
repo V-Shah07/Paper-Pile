@@ -22,7 +22,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { deleteDocument } from "../services/documentService";
+import { deleteDocument, updateDocument } from "../services/documentService";
 
 // Import components
 import CategoryChip from "@/components/CategoryChip";
@@ -95,10 +95,10 @@ export default function DocumentDetailScreen() {
     if (!dateInput) return "N/A";
 
     let date: Date;
-    
+
     if (typeof dateInput === "string") {
       // Check if it's an ISO timestamp (has 'T' in it)
-      if (dateInput.includes('T')) {
+      if (dateInput.includes("T")) {
         // ISO format like "2025-10-29T17:01:30.144Z" - use standard parsing
         date = new Date(dateInput);
       } else {
@@ -109,12 +109,12 @@ export default function DocumentDetailScreen() {
     } else {
       date = dateInput;
     }
-    
+
     // Check if date is valid
     if (isNaN(date.getTime())) {
       return "Invalid date";
     }
-    
+
     return date.toLocaleDateString("en-US", {
       month: "long",
       day: "numeric",
@@ -195,22 +195,52 @@ export default function DocumentDetailScreen() {
     );
   };
 
-  const handleToggleSensitive = () => {
+  const handleToggleSensitive = async () => {
     if (!document) return;
 
-    console.log("Toggle sensitive:", document.id);
+    const newSensitiveState = !document.isSensitive;
+
     Alert.alert(
-      document.isSensitive ? "Remove Sensitive Mark" : "Mark as Sensitive",
-      document.isSensitive
-        ? "This document will be visible to all family members."
-        : "This document will be hidden from other family members.",
+      newSensitiveState ? "Mark as Sensitive" : "Remove Sensitive Mark",
+      newSensitiveState
+        ? "This document will be hidden from other family members."
+        : "This document will be visible to all family members.",
       [
         { text: "Cancel", style: "cancel" },
         {
           text: "Confirm",
-          onPress: () => {
-            // TODO: Update document sensitivity in Firestore
-            console.log("Sensitivity toggled");
+          onPress: async () => {
+            try {
+              console.log(
+                "🔒 [DocumentDetail] Toggling sensitive to:",
+                newSensitiveState
+              );
+
+              // Update in Firestore
+              await updateDocument(document.id, {
+                isSensitive: newSensitiveState,
+              });
+
+              // Update local state immediately for UI feedback
+              setDocument({
+                ...document,
+                isSensitive: newSensitiveState,
+              });
+
+              console.log(
+                "✅ [DocumentDetail] Sensitivity updated successfully"
+              );
+              Alert.alert("Success", `Document ${newSensitiveState ? 'marked' : 'unmarked'} as sensitive`);
+            } catch (error) {
+              console.error(
+                "❌ [DocumentDetail] Failed to toggle sensitivity:",
+                error
+              );
+              Alert.alert(
+                "Error",
+                "Failed to update document. Please try again."
+              );
+            }
           },
         },
       ]
