@@ -16,6 +16,8 @@ import { processDocumentWithAI } from "../services/backendService";
 
 import { deleteDocument } from "../services/documentService";
 
+import LoadingOverlay from "@/components/LoadingOverlay";
+
 import {
   ActivityIndicator,
   Alert,
@@ -66,6 +68,7 @@ export default function HomeScreen() {
 
   const [sortBy, setSortBy] = useState<SortOptionId>("add-date-desc"); // NEW
   const [showFilterModal, setShowFilterModal] = useState(false); // NEW
+  const [isProcessing, setIsProcessing] = useState(false);
 
   useEffect(() => {
     loadDocuments();
@@ -259,12 +262,16 @@ export default function HomeScreen() {
         console.log("✅ Document created:", documentId);
 
         try {
+          setIsProcessing(true);
+
           // Process with AI
           const aiResult = await processDocumentWithAI(
             documentId,
             base64Image,
             userId
           );
+
+          setIsProcessing(false);
 
           console.log("✅ AI processing complete:", aiResult);
 
@@ -307,6 +314,7 @@ export default function HomeScreen() {
             },
           });
         } catch (error) {
+          setIsProcessing(false);
           console.error("❌ Error processing:", error);
 
           Alert.alert("Processing Error", "Add details manually or cancel?", [
@@ -393,6 +401,8 @@ export default function HomeScreen() {
         // ❌ NO ALERT HERE! Just process silently
 
         try {
+          setIsProcessing(true);
+
           // Process with AI
           const aiResult = await processDocumentWithAI(
             documentId,
@@ -400,7 +410,7 @@ export default function HomeScreen() {
             userId
           );
 
-          // ❌ NO ALERT HERE! Just check results
+          setIsProcessing(false);
 
           // Check if failed
           if (!aiResult.success || aiResult.error) {
@@ -444,6 +454,7 @@ export default function HomeScreen() {
         } catch (error) {
           // ✅ ONLY ALERT ON ERROR
           console.error("❌ Error processing:", error);
+          setIsProcessing(false);
 
           Alert.alert("Processing Error", "Add details manually or cancel?", [
             {
@@ -655,6 +666,11 @@ export default function HomeScreen() {
           </View>
         </View>
       </Modal>
+
+      <LoadingOverlay
+        visible={isProcessing}
+        message="🤖 PaperAI is analyzing your document..."
+      />
     </SafeAreaView>
   );
 }
