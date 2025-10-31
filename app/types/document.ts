@@ -32,6 +32,7 @@ export interface Document {
   
   // Processing status (so we know if AI is done)
   processingStatus?: 'pending' | 'processing' | 'completed' | 'failed';
+  isDraft?: boolean;  // ← ADD THIS
 }
 
 // send when CREATING a new document before AI processing
@@ -44,4 +45,5 @@ export interface DocumentInput {
   dateDocument?: string | null;
   expiryDate?: string | null;
   isSensitive?: boolean;
+  isDraft?: boolean;  // ← ADD THIS TOO
 }

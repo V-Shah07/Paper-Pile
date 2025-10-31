@@ -4,7 +4,7 @@
  * Handles TWO modes:
  * 1. NEW document - from camera/file picker
  * 2. EDIT existing - from document detail screen
- * 
+ *
  * ✅ NEW: Can mark document as sensitive while editing
  */
 
@@ -33,6 +33,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { createDocument, updateDocument } from "../services/documentService";
+import { deleteDocument } from "../services/documentService";
 import { DocumentInput } from "../types/document";
 
 export default function EditDetailsScreen() {
@@ -46,6 +47,7 @@ export default function EditDetailsScreen() {
 
   // State
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isAISuggested, setIsAISuggested] = useState(false);
   const [title, setTitle] = useState("");
   const [selectedCategory, setSelectedCategory] =
     useState<CategoryType>("receipt");
@@ -66,14 +68,35 @@ export default function EditDetailsScreen() {
   // Load existing document data if editing
   useEffect(() => {
     if (isEditing && documentId) {
+      // EDITING EXISTING DOC - Load from Firestore
       loadDocument();
     } else {
-      // For NEW documents, simulate OCR auto-fill after a brief delay
-      setTimeout(() => {
-        setTitle("Samsung Refrigerator Receipt");
-        setSelectedCategory("receipt");
-        setTags(["appliance", "kitchen", "best buy"]);
-      }, 800);
+      // NEW DOC - Load AI suggestions from route params
+      const suggestedTitle = params.suggestedTitle as string;
+      const suggestedCategory = params.suggestedCategory as string;
+      const suggestedTagsStr = params.suggestedTags as string;
+
+      if (suggestedTitle) {
+        console.log("✨ Pre-filling with AI suggestions...");
+        setTitle(suggestedTitle);
+        setIsAISuggested(true);
+        console.log("  Title:", suggestedTitle);
+      }
+
+      if (suggestedCategory) {
+        setSelectedCategory(suggestedCategory as CategoryType);
+        console.log("  Category:", suggestedCategory);
+      }
+
+      if (suggestedTagsStr) {
+        try {
+          const parsedTags = JSON.parse(suggestedTagsStr);
+          setTags(parsedTags);
+          console.log("  Tags:", parsedTags);
+        } catch (e) {
+          console.error("Failed to parse suggested tags:", e);
+        }
+      }
     }
   }, [isEditing, documentId]);
 
@@ -130,69 +153,60 @@ export default function EditDetailsScreen() {
   };
 
   const handleSave = async () => {
-    console.log("💾 [EditDetails] Starting save...");
-
-    // VALIDATION
+    // Validate
     if (!title.trim()) {
       Alert.alert("Error", "Please enter a document title");
-      return;
-    }
-
-    if (!user) {
-      Alert.alert("Error", "You must be logged in to save documents");
       return;
     }
 
     setIsProcessing(true);
 
     try {
-      // prepare doc
-      const documentData: DocumentInput = {
-        userId: user.uid,
+      // Prepare the update data
+      const documentData = {
         title: title.trim(),
         category: selectedCategory,
         tags: tags,
-        imageUrl: imageUri,
         dateDocument: date || null,
         expiryDate: expiryDate || null,
-        isSensitive: isSensitive, 
+        isSensitive: isSensitive,
+        isDraft: false,
+        // Don't include imageUrl, extractedText, summary - they're already there!
       };
 
-      console.log("💾 [EditDetails] Document data:", documentData);
-
-      // save/update firestore doc
-      if (isEditing) {
-        // update existing doc
-        console.log("💾 [EditDetails] Updating existing document:", documentId);
+      if (documentId) {
+        // UPDATE existing document (whether editing OR new with AI suggestions)
         await updateDocument(documentId, documentData);
       } else {
-        // create new doc
-        console.log("💾 [EditDetails] Creating new document...");
-        const newDocId = await createDocument(documentData);
-        console.log("✅ [EditDetails] Document created with ID:", newDocId);
+        // This should rarely happen now, but keep as fallback
+        // If somehow no documentId, create new
+        const newDocId = await createDocument({
+          userId: user?.uid || "default-user",
+          imageUrl: imageUri,
+          ...documentData,
+        });
       }
 
-      // success
+      setIsProcessing(false);
+
       Alert.alert(
         "Success!",
-        isEditing
+        documentId
           ? "Document updated successfully"
           : "Document saved successfully",
         [
           {
             text: "OK",
             onPress: () => {
-              console.log("💾 [EditDetails] Navigating back to home...");
               router.push("/(tabs)");
             },
           },
         ]
       );
-    } catch (error: any) {
-      console.error("❌ [EditDetails] Save failed:", error);
-      Alert.alert("Error", "Failed to save document. Please try again.");
-    } finally {
+    } catch (error) {
       setIsProcessing(false);
+      console.error("Error saving document:", error);
+      Alert.alert("Error", "Failed to save document. Please try again.");
     }
   };
 
@@ -208,7 +222,21 @@ export default function EditDetailsScreen() {
         {
           text: "Discard",
           style: "destructive",
-          onPress: () => {
+          onPress: async () => {
+            // If it's a new document (draft), DELETE it!
+            if (!isEditing && documentId) {
+              console.log("🗑️ Attempting to delete draft:", documentId);
+              console.log("🗑️ isEditing:", isEditing);
+              console.log("🗑️ documentId:", documentId);
+              try {
+                await deleteDocument(documentId);
+                console.log("🗑️ Draft document deleted:", documentId);
+              } catch (error) {
+                console.error("Failed to delete draft:", error);
+              }
+            }
+
+            // Navigate back
             if (isEditing) {
               router.back();
             } else {
@@ -259,9 +287,26 @@ export default function EditDetailsScreen() {
 
         {/* Title Input */}
         <View style={styles.section}>
-          <Text style={styles.sectionLabel}>
-            Title <Text style={styles.required}>*</Text>
-          </Text>
+          <View style={{ flexDirection: "row", alignItems: "center" }}>
+            <Text style={styles.sectionLabel}>
+              Title <Text style={styles.required}>*</Text>
+            </Text>
+            {isAISuggested && (
+              <View
+                style={{
+                  backgroundColor: Colors.primary,
+                  paddingHorizontal: 8,
+                  paddingVertical: 2,
+                  borderRadius: 12,
+                  marginLeft: 8,
+                }}
+              >
+                <Text style={{ color: "white", fontSize: 10 }}>
+                  ✨ AI Suggested
+                </Text>
+              </View>
+            )}
+          </View>
           <TextInput
             style={styles.input}
             value={title}

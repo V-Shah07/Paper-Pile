@@ -11,6 +11,11 @@ import { getUserDocuments } from "../services/documentService";
 import { convertImageToBase64 } from "../services/storageService";
 import { Document } from "../types/document";
 
+import { createDocument } from "../services/documentService";
+import { processDocumentWithAI } from "../services/backendService";
+
+import { deleteDocument } from "../services/documentService";
+
 import {
   ActivityIndicator,
   Alert,
@@ -159,6 +164,8 @@ export default function HomeScreen() {
   const filteredDocuments = useMemo(() => {
     let filtered = documents;
 
+    filtered = filtered.filter((doc) => !doc.isDraft);
+
     if (selectedCategory !== "all") {
       filtered = filtered.filter((doc) => doc.category === selectedCategory);
     }
@@ -195,109 +202,272 @@ export default function HomeScreen() {
   };
 
   // Handle camera selection
-  // Handle camera selection
   const handleSelectCamera = async () => {
-    if (!user) {
-      Alert.alert("Error", "You must be logged in to upload documents");
-      return;
-    }
-
-    const { status } = await ImagePicker.requestCameraPermissionsAsync();
-
-    if (status !== "granted") {
-      Alert.alert(
-        "Permission needed",
-        "Camera permission is required to scan documents"
-      );
-      return;
-    }
-
-    const result = await ImagePicker.launchCameraAsync({
-      allowsEditing: true,
-      quality: 0.7, // ← Compress to 70% to keep base64 size down
-      aspect: [3, 4],
-    });
-
-    if (result.canceled) {
-      return;
-    }
-
-    setShowUploadModal(false);
-
     try {
-      console.log("📤 Converting image to base64...");
+      // Request camera permissions
+      const { status } = await ImagePicker.requestCameraPermissionsAsync();
 
-      const documentId = generateDocumentId();
+      if (status !== "granted") {
+        Alert.alert(
+          "Permission needed",
+          "Camera permission is required to scan documents"
+        );
+        return;
+      }
 
-      // Convert to base64 instead of uploading to Storage
-      const imageBase64 = await convertImageToBase64(result.assets[0].uri);
-
-      console.log("✅ Conversion complete!");
-
-      // Navigate with base64 image
-      router.push({
-        pathname: "/screens/editDetails",
-        params: {
-          imageUri: imageBase64, // ← Now it's base64!
-          documentId: documentId,
-        },
+      // Launch camera
+      const result = await ImagePicker.launchCameraAsync({
+        allowsEditing: true,
+        quality: 0.8,
+        aspect: [3, 4],
+        base64: true,
       });
+
+      if (!result.canceled && result.assets[0]) {
+        const asset = result.assets[0];
+
+        // Get base64
+        let base64Image = asset.base64;
+        if (!base64Image) {
+          Alert.alert("Error", "Failed to process image");
+          return;
+        }
+
+        // Ensure data URI format
+        if (!base64Image.startsWith("data:image")) {
+          base64Image = `data:image/jpeg;base64,${base64Image}`;
+        }
+
+        // Check auth
+        if (!user?.uid) {
+          Alert.alert("Error", "You must be logged in");
+          return;
+        }
+
+        const userId = user.uid;
+
+        // Create document
+        const documentId = await createDocument({
+          userId: userId,
+          title: "",
+          category: "other",
+          tags: [],
+          imageUrl: base64Image,
+          isDraft: true,
+        });
+
+        console.log("✅ Document created:", documentId);
+
+        try {
+          // Process with AI
+          const aiResult = await processDocumentWithAI(
+            documentId,
+            base64Image,
+            userId
+          );
+
+          console.log("✅ AI processing complete:", aiResult);
+
+          // Check if failed
+          if (!aiResult.success || aiResult.error) {
+            Alert.alert(
+              "AI Processing Failed",
+              "Could not analyze document. Add details manually?",
+              [
+                {
+                  text: "Add Manually",
+                  onPress: () => {
+                    router.push({
+                      pathname: "/screens/editDetails",
+                      params: { imageUri: asset.uri, documentId: documentId },
+                    });
+                  },
+                },
+                {
+                  text: "Cancel",
+                  style: "cancel",
+                  onPress: async () => {
+                    await deleteDocument(documentId);
+                  },
+                },
+              ]
+            );
+            return;
+          }
+
+          // Success! Navigate with AI suggestions
+          router.push({
+            pathname: "/screens/editDetails",
+            params: {
+              imageUri: asset.uri,
+              documentId: documentId,
+              suggestedTitle: aiResult.suggested_title,
+              suggestedCategory: aiResult.category,
+              suggestedTags: JSON.stringify(aiResult.suggested_tags),
+            },
+          });
+        } catch (error) {
+          console.error("❌ Error processing:", error);
+
+          Alert.alert("Processing Error", "Add details manually or cancel?", [
+            {
+              text: "Add Manually",
+              onPress: () => {
+                router.push({
+                  pathname: "/screens/editDetails",
+                  params: { imageUri: asset.uri, documentId: documentId },
+                });
+              },
+            },
+            {
+              text: "Cancel",
+              style: "cancel",
+              onPress: async () => {
+                await deleteDocument(documentId);
+              },
+            },
+          ]);
+        }
+      }
     } catch (error) {
-      console.error("Conversion failed:", error);
-      Alert.alert("Error", "Could not process image. Please try again.");
+      console.error("❌ Error:", error);
+      Alert.alert("Error", "Failed to take photo");
     }
   };
 
   // Handle file selection
   const handleSelectFiles = async () => {
-    if (!user) {
-      Alert.alert("Error", "You must be logged in to upload documents");
-      return;
-    }
-
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-
-    if (status !== "granted") {
-      Alert.alert(
-        "Permission needed",
-        "Photos permission is required to select documents"
-      );
-      return;
-    }
-
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      quality: 0.7, // ← Compress
-      aspect: [3, 4],
-    });
-
-    if (result.canceled) {
-      return;
-    }
-
-    setShowUploadModal(false);
-
     try {
-      console.log("📤 Converting image to base64...");
+      // Permission check
+      const { status } =
+        await ImagePicker.requestMediaLibraryPermissionsAsync();
 
-      const documentId = generateDocumentId();
+      if (status !== "granted") {
+        Alert.alert("Permission needed", "Photos permission is required");
+        return;
+      }
 
-      // Convert to base64
-      const imageBase64 = await convertImageToBase64(result.assets[0].uri);
-
-      console.log("✅ Conversion complete!");
-
-      router.push({
-        pathname: "/screens/editDetails",
-        params: {
-          imageUri: imageBase64, // ← Base64
-          documentId: documentId,
-        },
+      // Pick image
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        quality: 0.8,
+        aspect: [3, 4],
+        base64: true,
       });
+
+      if (!result.canceled && result.assets[0]) {
+        const asset = result.assets[0];
+
+        // Get base64
+        let base64Image = asset.base64;
+        if (!base64Image) {
+          Alert.alert("Error", "Failed to process image");
+          return;
+        }
+
+        if (!base64Image.startsWith("data:image")) {
+          base64Image = `data:image/jpeg;base64,${base64Image}`;
+        }
+
+        // Check auth
+        if (!user?.uid) {
+          Alert.alert("Error", "You must be logged in");
+          return;
+        }
+
+        const userId = user.uid;
+
+        // ❌ NO ALERT HERE! Just create document silently
+
+        // Create document
+        const documentId = await createDocument({
+          userId: userId,
+          title: "",
+          category: "other",
+          tags: [],
+          imageUrl: base64Image,
+          isDraft: true,
+        });
+
+        // ❌ NO ALERT HERE! Just process silently
+
+        try {
+          // Process with AI
+          const aiResult = await processDocumentWithAI(
+            documentId,
+            base64Image,
+            userId
+          );
+
+          // ❌ NO ALERT HERE! Just check results
+
+          // Check if failed
+          if (!aiResult.success || aiResult.error) {
+            // ✅ ONLY ALERT ON ERROR
+            Alert.alert(
+              "AI Processing Failed",
+              "Could not analyze document. Add details manually?",
+              [
+                {
+                  text: "Add Manually",
+                  onPress: () => {
+                    router.push({
+                      pathname: "/screens/editDetails",
+                      params: { imageUri: asset.uri, documentId: documentId },
+                    });
+                  },
+                },
+                {
+                  text: "Cancel",
+                  style: "cancel",
+                  onPress: async () => {
+                    await deleteDocument(documentId);
+                  },
+                },
+              ]
+            );
+            return;
+          }
+
+          // Success! Navigate silently
+          router.push({
+            pathname: "/screens/editDetails",
+            params: {
+              imageUri: asset.uri,
+              documentId: documentId,
+              suggestedTitle: aiResult.suggested_title,
+              suggestedCategory: aiResult.category,
+              suggestedTags: JSON.stringify(aiResult.suggested_tags),
+            },
+          });
+        } catch (error) {
+          // ✅ ONLY ALERT ON ERROR
+          console.error("❌ Error processing:", error);
+
+          Alert.alert("Processing Error", "Add details manually or cancel?", [
+            {
+              text: "Add Manually",
+              onPress: () => {
+                router.push({
+                  pathname: "/screens/editDetails",
+                  params: { imageUri: asset.uri, documentId: documentId },
+                });
+              },
+            },
+            {
+              text: "Cancel",
+              style: "cancel",
+              onPress: async () => {
+                await deleteDocument(documentId);
+              },
+            },
+          ]);
+        }
+      }
     } catch (error) {
-      console.error("Conversion failed:", error);
-      Alert.alert("Error", "Could not process image. Please try again.");
+      console.error("❌ Error:", error);
+      Alert.alert("Error", "Failed to select file");
     }
   };
 
