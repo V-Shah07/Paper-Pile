@@ -16,7 +16,8 @@ import { useAuth } from "@/context/AuthContext";
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { doc, getDoc } from "firebase/firestore";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
+import { useFocusEffect } from "@react-navigation/native";
 
 import { Image } from "expo-image";
 import {
@@ -64,6 +65,7 @@ export default function EditDetailsScreen() {
   const [notes, setNotes] = useState("");
   const [showCategoryPicker, setShowCategoryPicker] = useState(false);
   const [isSensitive, setIsSensitive] = useState(false); // ✅ NEW: Track sensitive state
+  const didSaveRef = useRef(false);
 
   // Load existing document data if editing
   useEffect(() => {
@@ -99,6 +101,33 @@ export default function EditDetailsScreen() {
       }
     }
   }, [isEditing, documentId]);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      // Reset on mount
+      didSaveRef.current = false;
+
+      // Cleanup runs when screen loses focus
+      return async () => {
+        // Only clean up if:
+        // 1. It's a NEW document (not editing)
+        // 2. User didn't save
+        // 3. We have a documentId
+        if (!isEditing && !didSaveRef.current && documentId) {
+          console.log(
+            "🗑️ User left without saving - deleting draft:",
+            documentId
+          );
+          try {
+            await deleteDocument(documentId);
+            console.log("✅ Draft deleted");
+          } catch (error) {
+            console.error("Failed to delete draft:", error);
+          }
+        }
+      };
+    }, [isEditing, documentId])
+  );
 
   const loadDocument = async () => {
     if (!documentId) return;
@@ -158,7 +187,7 @@ export default function EditDetailsScreen() {
       Alert.alert("Error", "Please enter a document title");
       return;
     }
-
+    didSaveRef.current = true;
     setIsProcessing(true);
 
     try {
@@ -204,6 +233,7 @@ export default function EditDetailsScreen() {
         ]
       );
     } catch (error) {
+      didSaveRef.current = false;
       setIsProcessing(false);
       console.error("Error saving document:", error);
       Alert.alert("Error", "Failed to save document. Please try again.");
@@ -223,6 +253,7 @@ export default function EditDetailsScreen() {
           text: "Discard",
           style: "destructive",
           onPress: async () => {
+            didSaveRef.current = true;
             // If it's a new document (draft), DELETE it!
             if (!isEditing && documentId) {
               console.log("🗑️ Attempting to delete draft:", documentId);
