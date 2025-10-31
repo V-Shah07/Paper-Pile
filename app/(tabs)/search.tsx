@@ -35,7 +35,7 @@ import { Document } from "../types/document";
 import { styles } from "./search.styles";
 
 const RECENT_SEARCHES_KEY = "@recent_searches";
-const MAX_RECENT_SEARCHES = 5;
+const MAX_RECENT_SEARCHES = 4;
 
 export default function SearchScreen() {
   const router = useRouter();
@@ -235,7 +235,7 @@ export default function SearchScreen() {
                 </View>
               )}
 
-              {/* Quick Search Suggestions */}
+              {/* Quick Search Suggestions
               <View style={styles.section}>
                 <Text style={styles.sectionTitle}>Quick Search</Text>
                 <View style={styles.suggestionsGrid}>
@@ -262,7 +262,7 @@ export default function SearchScreen() {
                     </TouchableOpacity>
                   ))}
                 </View>
-              </View>
+              </View> */}
 
               {/* Browse by Category */}
               <View style={styles.section}>
