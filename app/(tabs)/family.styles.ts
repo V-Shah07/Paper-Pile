@@ -22,59 +22,68 @@ export const styles = StyleSheet.create({
     flex: 1,
   },
 
-  // Empty State Styles
+  // Empty State Styles - UPDATED FOR BETTER LAYOUT
   emptyContainer: {
     flex: 1,
     paddingHorizontal: Spacing.screenPadding,
-    paddingTop: Spacing['3xl'],
-    alignItems: 'center',
+    paddingTop: Spacing.xl, // Reduced from 3xl to xl
+    justifyContent: 'space-between', // NEW: Distribute space evenly
   },
   emptyIconContainer: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
+    width: 100, // Reduced from 120
+    height: 100, // Reduced from 120
+    borderRadius: 50,
     backgroundColor: Colors.backgroundSecondary,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: Spacing.xl,
+    marginBottom: Spacing.md, // Reduced from xl
+    alignSelf: 'center',
   },
   emptyTitle: {
-    fontSize: Typography.sizes['2xl'],
+    fontSize: Typography.sizes.xl, // Reduced from 2xl
     fontWeight: Typography.weights.bold,
     color: Colors.text,
     marginBottom: Spacing.sm,
     textAlign: 'center',
   },
   emptySubtitle: {
-    fontSize: Typography.sizes.base,
+    fontSize: Typography.sizes.sm, // Reduced from base
     color: Colors.textSecondary,
     textAlign: 'center',
-    lineHeight: Typography.lineHeights.relaxed * Typography.sizes.base,
-    marginBottom: Spacing.xl,
+    lineHeight: Typography.lineHeights.relaxed * Typography.sizes.sm,
+    marginBottom: Spacing.md, // Reduced from xl
+    paddingHorizontal: Spacing.md,
   },
   benefitsList: {
     width: '100%',
-    marginBottom: Spacing.xl,
+    marginBottom: Spacing.lg, // Reduced from xl
   },
   benefitItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: Spacing.md,
+    marginBottom: Spacing.sm, // Reduced from md
   },
   benefitText: {
-    fontSize: Typography.sizes.base,
+    fontSize: Typography.sizes.sm, // Reduced from base
     color: Colors.text,
     marginLeft: Spacing.md,
   },
+  // NEW: Container for action buttons
   emptyActions: {
     width: '100%',
     gap: Spacing.md,
+    paddingBottom: Spacing.lg,
   },
+  // UPDATED: Wider buttons with flexDirection row
   primaryButton: {
+    flexDirection: 'row',
     backgroundColor: Colors.primary,
-    paddingVertical: Spacing.md,
+    paddingVertical: Spacing.md + 2, // Slightly taller
+    paddingHorizontal: Spacing.lg, // NEW: Added horizontal padding
     borderRadius: BorderRadius.lg,
     alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.sm, // NEW: Space between icon and text
     ...Shadows.sm,
   },
   primaryButtonText: {
@@ -82,11 +91,16 @@ export const styles = StyleSheet.create({
     fontWeight: Typography.weights.semibold,
     color: Colors.background,
   },
+  // UPDATED: Wider buttons with flexDirection row
   secondaryButton: {
+    flexDirection: 'row',
     backgroundColor: Colors.backgroundSecondary,
-    paddingVertical: Spacing.md,
+    paddingVertical: Spacing.md + 2, // Slightly taller
+    paddingHorizontal: Spacing.lg, // NEW: Added horizontal padding
     borderRadius: BorderRadius.lg,
     alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.sm, // NEW: Space between icon and text
     borderWidth: 1,
     borderColor: Colors.border,
   },
@@ -96,7 +110,7 @@ export const styles = StyleSheet.create({
     color: Colors.text,
   },
 
-  // Family Card Styles
+  // Family Card Styles - UPDATED (removed invite code section styles)
   familyCard: {
     backgroundColor: Colors.surface,
     margin: Spacing.screenPadding,
@@ -107,7 +121,7 @@ export const styles = StyleSheet.create({
   familyCardHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: Spacing.lg,
+    // REMOVED: marginBottom since no invite code section below
   },
   familyIconContainer: {
     width: 56,
@@ -131,39 +145,8 @@ export const styles = StyleSheet.create({
     fontSize: Typography.sizes.sm,
     color: Colors.textSecondary,
   },
-  inviteCodeSection: {
-    borderTopWidth: 1,
-    borderTopColor: Colors.divider,
-    paddingTop: Spacing.md,
-  },
-  inviteCodeHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: Spacing.sm,
-  },
-  inviteCodeLabel: {
-    fontSize: Typography.sizes.sm,
-    fontWeight: Typography.weights.semibold,
-    color: Colors.textSecondary,
-  },
-  shareLink: {
-    fontSize: Typography.sizes.sm,
-    fontWeight: Typography.weights.semibold,
-    color: Colors.primary,
-  },
-  inviteCodeBox: {
-    backgroundColor: Colors.backgroundSecondary,
-    padding: Spacing.md,
-    borderRadius: BorderRadius.md,
-    alignItems: 'center',
-  },
-  inviteCode: {
-    fontSize: Typography.sizes.lg,
-    fontWeight: Typography.weights.bold,
-    color: Colors.text,
-    letterSpacing: 2,
-  },
+  // REMOVED: inviteCodeSection, inviteCodeHeader, inviteCodeLabel, shareLink, inviteCodeBox, inviteCode
+  // These are no longer needed since we removed that section
 
   // Toggle Card Styles
   toggleCard: {

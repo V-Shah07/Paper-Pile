@@ -5,6 +5,7 @@
  * Provides login, signup, logout functions to the entire app.
  */
 
+import { UserProfile } from "@/app/types/family";
 import { auth, db } from "@/config/firebase";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
@@ -16,17 +17,19 @@ import {
   signOut,
   updateProfile,
 } from "firebase/auth";
-import { doc, setDoc } from "firebase/firestore";
+import { doc, setDoc, getDoc } from "firebase/firestore";
 import React, { createContext, useContext, useEffect, useState } from "react";
 // import AsyncStorage from '@react-native-async-storage/async-storage'; // Temporarily disabled for Expo Go
 
 interface AuthContextType {
   user: User | null;
+  userProfile: UserProfile | null;
   loading: boolean;
   signup: (email: string, password: string, name: string) => Promise<void>;
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
+  refreshUserProfile: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType>({} as AuthContextType);
@@ -38,6 +41,40 @@ export function useAuth() {
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+
+  const loadUserProfile = async (userId: string) => {
+    try {
+      console.log("🔵 [Auth] Loading user profile from Firestore...");
+
+      const userDoc = await getDoc(doc(db, "users", userId));
+
+      if (userDoc.exists()) {
+        const data = userDoc.data();
+        const profile: UserProfile = {
+          userId: userId,
+          email: data.email,
+          name: data.name,
+          familyId: data.familyId || null,
+          familyRole: data.familyRole || undefined,
+          createdAt: data.createdAt,
+          updatedAt: data.updatedAt,
+        };
+
+        setUserProfile(profile);
+        console.log("✅ [Auth] User profile loaded:", {
+          familyId: profile.familyId,
+          familyRole: profile.familyRole,
+        });
+      } else {
+        console.log("⚠️  [Auth] User profile not found in Firestore");
+        setUserProfile(null);
+      }
+    } catch (error) {
+      console.error("❌ [Auth] Error loading user profile:", error);
+      setUserProfile(null);
+    }
+  };
 
   useEffect(() => {
     console.log("🔵 [Auth] Setting up auth listener...");
@@ -47,9 +84,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (user) {
         console.log("✅ [Auth] User logged in:", user.email);
         await AsyncStorage.setItem("isLoggedIn", "true");
+        await loadUserProfile(user.uid);
       } else {
         console.log("❌ [Auth] No user logged in");
         await AsyncStorage.removeItem("isLoggedIn");
+        setUserProfile(null);
       }
 
       setUser(user);
@@ -88,6 +127,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         createdAt: new Date().toISOString(),
         avatarUrl: null,
         familyId: null,
+        familyRole: null,
         storageUsed: 0,
       };
       console.log("Document data:", userDocData);
@@ -95,6 +135,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await setDoc(doc(db, "users", user.uid), userDocData);
 
       console.log("✅ [4/4] Firestore document created!");
+
+      // Load the profile we just created
+      console.log("🔵 [5/5] Loading user profile...");
+      await loadUserProfile(user.uid);
+      console.log("✅ [5/5] User profile loaded!");
+
       console.log("🎉 SIGNUP COMPLETE! User ID:", user.uid);
     } catch (error: any) {
       console.error("❌ SIGNUP ERROR");
@@ -116,6 +162,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = async () => {
     try {
       await signOut(auth);
+      setUserProfile(null);
       // await AsyncStorage.removeItem('isLoggedIn'); // Temporarily disabled for Expo Go
       console.log("Logout successful");
     } catch (error: any) {
@@ -135,13 +182,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const refreshUserProfile = async () => {
+    if (user) {
+      console.log("🔵 [Auth] Manually refreshing user profile...");
+      await loadUserProfile(user.uid);
+    }
+  };
+
   const value = {
     user,
+    userProfile,
     loading,
     signup,
     login,
     logout,
     resetPassword,
+    refreshUserProfile
   };
 
   return (

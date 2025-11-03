@@ -1,19 +1,11 @@
 /**
- * Family Screen
+ * Family Screen - UPDATED WITH REAL DATA & UI FIXES
  * 
- * Handles family sharing and collaboration features.
- * Shows family members, allows inviting new members, and manages document visibility.
- * 
- * TWO STATES:
- * 1. NO FAMILY - Shows empty state with create/join options
- * 2. HAS FAMILY - Shows family members and management options
- * 
- * USAGE:
- * - Place in app/(tabs) folder as a tab screen
- * - For now uses dummy data, replace with API calls later
+ * Connected to Firebase and AuthContext.
+ * UI improvements: Better button sizing, no scrolling needed, cleaner layout
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -24,141 +16,209 @@ import {
   Modal,
   Share,
   Platform,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '@/constants/theme';
 import { styles } from './family.styles';
 
-// Dummy data - replace with API calls later
-interface FamilyMember {
-  id: string;
-  name: string;
-  email: string;
-  role: 'admin' | 'member';
-  documentCount: number;
-  avatar?: string; // URL or initials
-  joinedDate: string;
-}
+// ============================================
+// IMPORTS
+// ============================================
+import { useAuth } from '@/context/AuthContext';
+import {
+  createFamily,
+  joinFamily,
+  leaveFamily,
+  removeMember,
+  getFamily,
+} from '../services/familyService';
+import { Family } from '../types/family';
 
-const DUMMY_FAMILY = {
-  id: 'fam-123',
-  name: 'The Johnson Family',
-  inviteCode: 'JOIN-ABC123',
-  members: [
-    {
-      id: '1',
-      name: 'John Doe',
-      email: 'john@example.com',
-      role: 'admin' as const,
-      documentCount: 12,
-      avatar: 'JD',
-      joinedDate: '2024-01-15',
-    },
-    {
-      id: '2',
-      name: 'Sarah Doe',
-      email: 'sarah@example.com',
-      role: 'member' as const,
-      documentCount: 8,
-      avatar: 'SD',
-      joinedDate: '2024-01-16',
-    },
-    {
-      id: '3',
-      name: 'Emma Doe',
-      email: 'emma@example.com',
-      role: 'member' as const,
-      documentCount: 3,
-      avatar: 'ED',
-      joinedDate: '2024-02-01',
-    },
-  ],
-};
-
+// ============================================
+// COMPONENT
+// ============================================
 export default function FamilyScreen() {
+  // Get user info from AuthContext
+  const { user, userProfile, refreshUserProfile } = useAuth();
+
   // State
-  const [hasFamily, setHasFamily] = useState(false); // Set to false to see empty state
+  const [family, setFamily] = useState<Family | null>(null);
+  const [loading, setLoading] = useState(true);
   const [showAllDocuments, setShowAllDocuments] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showJoinModal, setShowJoinModal] = useState(false);
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [familyName, setFamilyName] = useState('');
   const [joinCode, setJoinCode] = useState('');
+  const [isProcessing, setIsProcessing] = useState(false);
 
-  // Current family data (in real app, fetch from API)
-  const family = hasFamily ? DUMMY_FAMILY : null;
+  // ============================================
+  // LOAD FAMILY DATA ON MOUNT
+  // ============================================
+  useEffect(() => {
+    loadFamilyData();
+  }, [userProfile?.familyId]);
 
-  // Handle creating a family
-  const handleCreateFamily = () => {
+  const loadFamilyData = async () => {
+    try {
+      setLoading(true);
+      
+      // Check if user has a family
+      if (userProfile?.familyId) {
+        console.log('🔵 Loading family data...');
+        const familyData = await getFamily(userProfile.familyId);
+        
+        if (familyData) {
+          setFamily(familyData);
+          console.log('✅ Family loaded:', familyData.name);
+        } else {
+          console.log('⚠️  Family not found');
+          setFamily(null);
+        }
+      } else {
+        console.log('ℹ️  User not in a family');
+        setFamily(null);
+      }
+    } catch (error) {
+      console.error('❌ Error loading family:', error);
+      Alert.alert('Error', 'Failed to load family data');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ============================================
+  // CREATE FAMILY (REAL API CALL)
+  // ============================================
+  const handleCreateFamily = async () => {
     if (!familyName.trim()) {
       Alert.alert('Error', 'Please enter a family name');
       return;
     }
 
-    // TODO: API call to create family
-    console.log('Creating family:', familyName);
-    
-    // Simulate success
-    Alert.alert(
-      'Family Created!',
-      `"${familyName}" has been created. You can now invite members.`,
-      [
-        {
-          text: 'OK',
-          onPress: () => {
-            setShowCreateModal(false);
-            setHasFamily(true);
-            setFamilyName('');
+    if (!user || !userProfile) {
+      Alert.alert('Error', 'User not logged in');
+      return;
+    }
+
+    setIsProcessing(true);
+
+    try {
+      console.log('🔵 Creating family:', familyName);
+      
+      // Call the real API
+      const newFamily = await createFamily({
+        name: familyName.trim(),
+        userId: user.uid,
+        userName: userProfile.name || user.email || 'Unknown',
+        userEmail: user.email || '',
+      });
+
+      console.log('✅ Family created:', newFamily);
+
+      // Refresh user profile to get updated familyId
+      await refreshUserProfile();
+
+      // Load the new family data
+      await loadFamilyData();
+
+      // Show success
+      Alert.alert(
+        'Family Created! 🎉',
+        `"${familyName}" has been created.\n\nInvite Code: ${newFamily.inviteCode}\n\nShare this code with family members so they can join.`,
+        [
+          {
+            text: 'OK',
+            onPress: () => {
+              setShowCreateModal(false);
+              setFamilyName('');
+            },
           },
-        },
-      ]
-    );
+        ]
+      );
+    } catch (error: any) {
+      console.error('❌ Error creating family:', error);
+      Alert.alert('Error', error.message || 'Failed to create family');
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
-  // Handle joining a family
-  const handleJoinFamily = () => {
+  // ============================================
+  // JOIN FAMILY (REAL API CALL)
+  // ============================================
+  const handleJoinFamily = async () => {
     if (!joinCode.trim()) {
       Alert.alert('Error', 'Please enter an invite code');
       return;
     }
 
-    // TODO: API call to join family
-    console.log('Joining with code:', joinCode);
-    
-    // Simulate success
-    Alert.alert(
-      'Joined Family!',
-      'You are now part of the family group.',
-      [
-        {
-          text: 'OK',
-          onPress: () => {
-            setShowJoinModal(false);
-            setHasFamily(true);
-            setJoinCode('');
+    if (!user || !userProfile) {
+      Alert.alert('Error', 'User not logged in');
+      return;
+    }
+
+    setIsProcessing(true);
+
+    try {
+      console.log('🔵 Joining family with code:', joinCode);
+      
+      // Call the real API
+      const joinedFamily = await joinFamily({
+        inviteCode: joinCode.trim(),
+        userId: user.uid,
+        userName: userProfile.name || user.email || 'Unknown',
+        userEmail: user.email || '',
+      });
+
+      console.log('✅ Joined family:', joinedFamily.name);
+
+      // Refresh user profile to get updated familyId
+      await refreshUserProfile();
+
+      // Load the new family data
+      await loadFamilyData();
+
+      // Show success
+      Alert.alert(
+        'Joined Family! 🎉',
+        `You are now part of "${joinedFamily.name}"`,
+        [
+          {
+            text: 'OK',
+            onPress: () => {
+              setShowJoinModal(false);
+              setJoinCode('');
+            },
           },
-        },
-      ]
-    );
+        ]
+      );
+    } catch (error: any) {
+      console.error('❌ Error joining family:', error);
+      Alert.alert('Error', error.message || 'Failed to join family');
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
-  // Handle inviting a member
+  // ============================================
+  // INVITE MEMBER (SHARE CODE)
+  // ============================================
   const handleInvite = async () => {
-    if (!family) return; // Guard clause
+    if (!family) return;
     
-    const inviteMessage = `Join our Paper Pile family group!\n\nFamily: ${family.name}\nInvite Code: ${family.inviteCode}\n\nDownload Paper Pile and use this code to join.`;
+    const inviteMessage = `Join our PaperPile family group!\n\nFamily: ${family.name}\nInvite Code: ${family.inviteCode}\n\nDownload PaperPile and use this code to join.`;
 
     try {
       if (Platform.OS === 'web') {
-        // For web, just copy to clipboard
         Alert.alert(
           'Invite Code',
           `Share this code with family members:\n\n${family.inviteCode}`,
           [{ text: 'OK' }]
         );
       } else {
-        // For mobile, use native share
         await Share.share({
           message: inviteMessage,
         });
@@ -169,28 +229,48 @@ export default function FamilyScreen() {
     }
   };
 
-  // Handle removing a member (admin only)
-  const handleRemoveMember = (member: FamilyMember) => {
+  // ============================================
+  // REMOVE MEMBER (REAL API CALL)
+  // ============================================
+  const handleRemoveMember = async (memberId: string, memberName: string) => {
+    if (!user || !family) return;
+
     Alert.alert(
       'Remove Member',
-      `Are you sure you want to remove ${member.name} from the family?`,
+      `Are you sure you want to remove ${memberName} from the family?`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Remove',
           style: 'destructive',
-          onPress: () => {
-            // TODO: API call to remove member
-            console.log('Removing member:', member.id);
-            Alert.alert('Success', `${member.name} has been removed`);
+          onPress: async () => {
+            try {
+              console.log('🔵 Removing member:', memberId);
+              
+              await removeMember(user.uid, family.id, memberId);
+              
+              console.log('✅ Member removed');
+              
+              // Reload family data
+              await loadFamilyData();
+              
+              Alert.alert('Success', `${memberName} has been removed from the family`);
+            } catch (error: any) {
+              console.error('❌ Error removing member:', error);
+              Alert.alert('Error', error.message || 'Failed to remove member');
+            }
           },
         },
       ]
     );
   };
 
-  // Handle leaving family
+  // ============================================
+  // LEAVE FAMILY (REAL API CALL)
+  // ============================================
   const handleLeaveFamily = () => {
+    if (!user || !family) return;
+
     Alert.alert(
       'Leave Family',
       'Are you sure you want to leave this family group? You will lose access to shared documents.',
@@ -199,38 +279,88 @@ export default function FamilyScreen() {
         {
           text: 'Leave',
           style: 'destructive',
-          onPress: () => {
-            // TODO: API call to leave family
-            console.log('Leaving family');
-            setHasFamily(false);
-            Alert.alert('Left Family', 'You have left the family group');
+          onPress: async () => {
+            try {
+              console.log('🔵 Leaving family...');
+              
+              await leaveFamily(user.uid, family.id);
+              
+              console.log('✅ Left family');
+              
+              // Refresh user profile
+              await refreshUserProfile();
+              
+              // Clear family data
+              setFamily(null);
+              
+              Alert.alert('Left Family', 'You have left the family group');
+            } catch (error: any) {
+              console.error('❌ Error leaving family:', error);
+              Alert.alert('Error', error.message || 'Failed to leave family');
+            }
           },
         },
       ]
     );
   };
 
-  // Render avatar circle
-  const renderAvatar = (member: FamilyMember) => {
+  // ============================================
+  // RENDER AVATAR
+  // ============================================
+  const renderAvatar = (name: string) => {
+    // Get initials from name
+    const initials = name
+      .split(' ')
+      .map(word => word[0])
+      .join('')
+      .toUpperCase()
+      .slice(0, 2);
+
     return (
       <View style={styles.avatar}>
-        <Text style={styles.avatarText}>{member.avatar}</Text>
+        <Text style={styles.avatarText}>{initials}</Text>
       </View>
     );
   };
 
+  // ============================================
+  // CHECK IF CURRENT USER IS ADMIN
+  // ============================================
+  const isCurrentUserAdmin = () => {
+    if (!user || !family) return false;
+    const currentMember = family.members.find(m => m.userId === user.uid);
+    return currentMember?.role === 'admin';
+  };
+
+  // ============================================
+  // LOADING STATE
+  // ============================================
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>Family</Text>
+        </View>
+        <View style={[styles.emptyContainer, { justifyContent: 'center' }]}>
+          <ActivityIndicator size="large" color={Colors.primary} />
+          <Text style={[styles.emptySubtitle, { marginTop: 16 }]}>Loading...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // ============================================
   // EMPTY STATE - No family yet
-  if (!hasFamily) {
+  // ============================================
+  if (!family) {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.header}>
           <Text style={styles.headerTitle}>Family</Text>
         </View>
 
-        <ScrollView 
-          contentContainerStyle={styles.emptyContainer}
-          showsVerticalScrollIndicator={false}
-        >
+        {/* FIX: Changed ScrollView to View - no scrolling needed */}
+        <View style={styles.emptyContainer}>
           {/* Illustration */}
           <View style={styles.emptyIconContainer}>
             <Ionicons name="people" size={64} color={Colors.textLight} />
@@ -252,20 +382,21 @@ export default function FamilyScreen() {
             </View>
             <View style={styles.benefitItem}>
               <Ionicons name="checkmark-circle" size={24} color={Colors.success} />
-              <Text style={styles.benefitText}>Control who sees what</Text>
+              <Text style={styles.benefitText}>Control what you share</Text>
             </View>
             <View style={styles.benefitItem}>
               <Ionicons name="checkmark-circle" size={24} color={Colors.success} />
-              <Text style={styles.benefitText}>Keep everyone organized</Text>
+              <Text style={styles.benefitText}>Keep sensitive docs private</Text>
             </View>
           </View>
 
-          {/* Action Buttons */}
+          {/* FIX: Action Buttons now wrapped in container for proper layout */}
           <View style={styles.emptyActions}>
             <TouchableOpacity
               style={styles.primaryButton}
               onPress={() => setShowCreateModal(true)}
             >
+              <Ionicons name="add-circle" size={24} color={Colors.background} />
               <Text style={styles.primaryButtonText}>Create Family Group</Text>
             </TouchableOpacity>
 
@@ -273,17 +404,18 @@ export default function FamilyScreen() {
               style={styles.secondaryButton}
               onPress={() => setShowJoinModal(true)}
             >
+              <Ionicons name="enter" size={24} color={Colors.primary} />
               <Text style={styles.secondaryButtonText}>Join Existing Group</Text>
             </TouchableOpacity>
           </View>
-        </ScrollView>
+        </View>
 
         {/* Create Family Modal */}
         <Modal
           visible={showCreateModal}
           transparent
           animationType="fade"
-          onRequestClose={() => setShowCreateModal(false)}
+          onRequestClose={() => !isProcessing && setShowCreateModal(false)}
         >
           <View style={styles.modalBackdrop}>
             <View style={styles.modalContent}>
@@ -296,6 +428,7 @@ export default function FamilyScreen() {
                 placeholder="Enter family name (e.g., The Smiths)"
                 placeholderTextColor={Colors.textLight}
                 autoFocus
+                editable={!isProcessing}
               />
 
               <View style={styles.modalActions}>
@@ -305,14 +438,20 @@ export default function FamilyScreen() {
                     setShowCreateModal(false);
                     setFamilyName('');
                   }}
+                  disabled={isProcessing}
                 >
                   <Text style={styles.modalButtonTextSecondary}>Cancel</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[styles.modalButton, styles.modalButtonPrimary]}
                   onPress={handleCreateFamily}
+                  disabled={isProcessing}
                 >
-                  <Text style={styles.modalButtonTextPrimary}>Create</Text>
+                  {isProcessing ? (
+                    <ActivityIndicator size="small" color={Colors.background} />
+                  ) : (
+                    <Text style={styles.modalButtonTextPrimary}>Create</Text>
+                  )}
                 </TouchableOpacity>
               </View>
             </View>
@@ -324,7 +463,7 @@ export default function FamilyScreen() {
           visible={showJoinModal}
           transparent
           animationType="fade"
-          onRequestClose={() => setShowJoinModal(false)}
+          onRequestClose={() => !isProcessing && setShowJoinModal(false)}
         >
           <View style={styles.modalBackdrop}>
             <View style={styles.modalContent}>
@@ -334,10 +473,12 @@ export default function FamilyScreen() {
                 style={styles.input}
                 value={joinCode}
                 onChangeText={setJoinCode}
-                placeholder="Enter invite code (e.g., JOIN-ABC123)"
+                placeholder="Enter 6-digit code (e.g., 123456)"
                 placeholderTextColor={Colors.textLight}
-                autoCapitalize="characters"
+                autoCapitalize="none"
                 autoFocus
+                editable={!isProcessing}
+                maxLength={7} // 6 digits + optional hyphen
               />
 
               <Text style={styles.helperText}>
@@ -351,14 +492,20 @@ export default function FamilyScreen() {
                     setShowJoinModal(false);
                     setJoinCode('');
                   }}
+                  disabled={isProcessing}
                 >
                   <Text style={styles.modalButtonTextSecondary}>Cancel</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[styles.modalButton, styles.modalButtonPrimary]}
                   onPress={handleJoinFamily}
+                  disabled={isProcessing}
                 >
-                  <Text style={styles.modalButtonTextPrimary}>Join</Text>
+                  {isProcessing ? (
+                    <ActivityIndicator size="small" color={Colors.background} />
+                  ) : (
+                    <Text style={styles.modalButtonTextPrimary}>Join</Text>
+                  )}
                 </TouchableOpacity>
               </View>
             </View>
@@ -368,7 +515,9 @@ export default function FamilyScreen() {
     );
   }
 
+  // ============================================
   // HAS FAMILY STATE - Show family management
+  // ============================================
   return (
     <SafeAreaView style={styles.container}>
       {/* Header */}
@@ -383,32 +532,20 @@ export default function FamilyScreen() {
         style={styles.content}
         showsVerticalScrollIndicator={false}
       >
-        {/* Family Info Card */}
+        {/* FIX: Family Info Card - Removed invite code section, kept only the header */}
         <View style={styles.familyCard}>
           <View style={styles.familyCardHeader}>
             <View style={styles.familyIconContainer}>
               <Ionicons name="people" size={32} color={Colors.primary} />
             </View>
             <View style={styles.familyInfo}>
-              <Text style={styles.familyName}>{family?.name || ''}</Text>
+              <Text style={styles.familyName}>{family.name}</Text>
               <Text style={styles.familyMeta}>
-                {family?.members.length || 0} {family?.members.length === 1 ? 'member' : 'members'}
+                {family.members.length} {family.members.length === 1 ? 'member' : 'members'}
               </Text>
             </View>
           </View>
-
-          {/* Invite Code Section */}
-          <View style={styles.inviteCodeSection}>
-            <View style={styles.inviteCodeHeader}>
-              <Text style={styles.inviteCodeLabel}>Invite Code</Text>
-              <TouchableOpacity onPress={() => setShowInviteModal(true)}>
-                <Text style={styles.shareLink}>Share</Text>
-              </TouchableOpacity>
-            </View>
-            <View style={styles.inviteCodeBox}>
-              <Text style={styles.inviteCode}>{family?.inviteCode || ''}</Text>
-            </View>
-          </View>
+          {/* REMOVED: Invite Code Section - redundant with add person button */}
         </View>
 
         {/* Document Visibility Toggle */}
@@ -442,38 +579,45 @@ export default function FamilyScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Members</Text>
           
-          {family?.members.map((member) => (
-            <View key={member.id} style={styles.memberCard}>
-              {/* Avatar */}
-              {renderAvatar(member)}
+          {family.members.map((member) => {
+            const isCurrentUser = member.userId === user?.uid;
+            const canRemove = isCurrentUserAdmin() && !isCurrentUser && member.role !== 'admin';
 
-              {/* Member Info */}
-              <View style={styles.memberInfo}>
-                <View style={styles.memberHeader}>
-                  <Text style={styles.memberName}>{member.name}</Text>
-                  {member.role === 'admin' && (
-                    <View style={styles.adminBadge}>
-                      <Text style={styles.adminBadgeText}>Admin</Text>
-                    </View>
-                  )}
+            return (
+              <View key={member.userId} style={styles.memberCard}>
+                {/* Avatar */}
+                {renderAvatar(member.name)}
+
+                {/* Member Info */}
+                <View style={styles.memberInfo}>
+                  <View style={styles.memberHeader}>
+                    <Text style={styles.memberName}>
+                      {member.name}{isCurrentUser && ' (You)'}
+                    </Text>
+                    {member.role === 'admin' && (
+                      <View style={styles.adminBadge}>
+                        <Text style={styles.adminBadgeText}>Admin</Text>
+                      </View>
+                    )}
+                  </View>
+                  <Text style={styles.memberEmail}>{member.email}</Text>
+                  <Text style={styles.memberMeta}>
+                    Joined {new Date(member.joinedAt).toLocaleDateString()}
+                  </Text>
                 </View>
-                <Text style={styles.memberEmail}>{member.email}</Text>
-                <Text style={styles.memberMeta}>
-                  {member.documentCount} {member.documentCount === 1 ? 'document' : 'documents'}
-                </Text>
-              </View>
 
-              {/* Actions (only show for non-admins and if current user is admin) */}
-              {member.role !== 'admin' && (
-                <TouchableOpacity
-                  style={styles.memberAction}
-                  onPress={() => handleRemoveMember(member)}
-                >
-                  <Ionicons name="ellipsis-horizontal" size={20} color={Colors.textSecondary} />
-                </TouchableOpacity>
-              )}
-            </View>
-          ))}
+                {/* Actions (only show if current user is admin and it's not themselves) */}
+                {canRemove && (
+                  <TouchableOpacity
+                    style={styles.memberAction}
+                    onPress={() => handleRemoveMember(member.userId, member.name)}
+                  >
+                    <Ionicons name="close-circle" size={24} color={Colors.error} />
+                  </TouchableOpacity>
+                )}
+              </View>
+            );
+          })}
         </View>
 
         {/* Leave Family Button */}
@@ -503,7 +647,7 @@ export default function FamilyScreen() {
             <View style={styles.inviteModalCode}>
               <Text style={styles.inviteModalLabel}>Share this code:</Text>
               <View style={styles.inviteModalCodeBox}>
-                <Text style={styles.inviteModalCodeText}>{family?.inviteCode || ''}</Text>
+                <Text style={styles.inviteModalCodeText}>{family.inviteCode}</Text>
               </View>
             </View>
 
@@ -516,7 +660,7 @@ export default function FamilyScreen() {
                 style={[styles.modalButton, styles.modalButtonSecondary]}
                 onPress={() => setShowInviteModal(false)}
               >
-                <Text style={styles.modalButtonTextSecondary}>Cancel</Text>
+                <Text style={styles.modalButtonTextSecondary}>Close</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.modalButton, styles.modalButtonPrimary]}
