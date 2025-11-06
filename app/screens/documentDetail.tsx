@@ -50,6 +50,7 @@ export default function DocumentDetailScreen() {
   const [imageHeight, setImageHeight] = useState(400);
 
   const documentId = params.documentId as string;
+  const isOwner = user?.uid == document?.userId;
 
   // Load document from Firestore
   useEffect(() => {
@@ -145,10 +146,19 @@ export default function DocumentDetailScreen() {
   };
 
   const handleDelete = () => {
+    if (!isOwner) {
+      Alert.alert(
+        'Not Allowed',
+        'Only the document owner can change sensitive status.'
+      );
+      return;
+    }
+
     if (!document) {
       Alert.alert("Error", "Document not found");
       return;
     }
+    
 
     Alert.alert(
       "Delete Document",
@@ -198,6 +208,14 @@ export default function DocumentDetailScreen() {
   const handleToggleSensitive = async () => {
     if (!document) return;
 
+    if (!isOwner) {
+      Alert.alert(
+        "Not Allowed",
+        "Only the document owner can change sensitive status."
+      );
+      return;
+    }
+
     const newSensitiveState = !document.isSensitive;
 
     Alert.alert(
@@ -230,7 +248,12 @@ export default function DocumentDetailScreen() {
               console.log(
                 "✅ [DocumentDetail] Sensitivity updated successfully"
               );
-              Alert.alert("Success", `Document ${newSensitiveState ? 'marked' : 'unmarked'} as sensitive`);
+              Alert.alert(
+                "Success",
+                `Document ${
+                  newSensitiveState ? "marked" : "unmarked"
+                } as sensitive`
+              );
             } catch (error) {
               console.error(
                 "❌ [DocumentDetail] Failed to toggle sensitivity:",
@@ -492,7 +515,11 @@ export default function DocumentDetailScreen() {
       {/* Fixed Bottom Actions */}
       <View style={styles.actionsContainer}>
         <TouchableOpacity
-          style={[styles.actionButton, styles.actionButtonSecondary]}
+          style={[
+            styles.actionButton,
+            styles.actionButtonSecondary,
+            !isOwner && styles.actionButtonDisabled,
+          ]}
           onPress={handleToggleSensitive}
         >
           <Ionicons
@@ -500,19 +527,40 @@ export default function DocumentDetailScreen() {
               document.isSensitive ? "lock-open-outline" : "lock-closed-outline"
             }
             size={20}
-            color={Colors.text}
+            color={!isOwner ? Colors.disabled : Colors.text}
           />
-          <Text style={styles.actionButtonSecondaryText}>
+          <Text
+            style={[
+              styles.actionButtonSecondaryText,
+              !isOwner && styles.actionButtonTextDisabled,
+            ]}
+          >
             {document.isSensitive ? "Unmark" : "Mark Sensitive"}
           </Text>
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={[styles.actionButton, styles.actionButtonDanger]}
+          style={[
+            styles.actionButton,
+            styles.actionButtonDanger,
+            !isOwner && styles.actionButtonDisabled,
+          ]}
           onPress={handleDelete}
+          //disabled={!isOwner}
         >
-          <Ionicons name="trash-outline" size={20} color={Colors.error} />
-          <Text style={styles.actionButtonDangerText}>Delete</Text>
+          <Ionicons
+            name="trash-outline"
+            size={20}
+            color={!isOwner ? Colors.disabled : Colors.error}
+          />
+          <Text
+            style={[
+              styles.actionButtonDangerText,
+              !isOwner && styles.actionButtonTextDisabled,
+            ]}
+          >
+            Delete
+          </Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>
@@ -735,5 +783,11 @@ const styles = StyleSheet.create({
     fontSize: Typography.sizes.base,
     fontWeight: Typography.weights.semibold,
     color: Colors.background,
+  },
+  actionButtonDisabled: {
+    opacity: 0.5,
+  },
+  actionButtonTextDisabled: {
+    color: Colors.disabled,
   },
 });

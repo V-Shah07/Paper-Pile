@@ -27,6 +27,8 @@ interface AuthContextType {
   loading: boolean;
   showAllDocuments: boolean;
   setShowAllDocuments: (value: boolean) => void;
+  familyRefreshKey: number;
+  triggerFamilyRefresh: () => void;
   signup: (email: string, password: string, name: string) => Promise<void>;
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
@@ -45,6 +47,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [showAllDocuments, setShowAllDocuments] = useState(true);
+  const [familyRefreshKey, setFamilyRefreshKey] = useState(0);
+
+  const triggerFamilyRefresh = () => {
+    setFamilyRefreshKey((prev) => prev + 1);
+  };
 
   const loadUserProfile = async (userId: string) => {
     try {
@@ -203,6 +210,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     logout,
     resetPassword,
     refreshUserProfile,
+    familyRefreshKey,
+    triggerFamilyRefresh,
   };
 
   return (

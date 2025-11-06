@@ -53,7 +53,7 @@ import { styles } from "./index.styles";
 
 export default function HomeScreen() {
   const router = useRouter();
-  const { user, logout, userProfile, showAllDocuments} = useAuth();
+  const { user, logout, userProfile, showAllDocuments, familyRefreshKey} = useAuth();
 
   const [documents, setDocuments] = useState<Document[]>([]);
   const [loading, setLoading] = useState(true);
@@ -72,7 +72,7 @@ export default function HomeScreen() {
 
   useEffect(() => {
     loadDocuments();
-  }, [user, showAllDocuments]); //reload if user changes
+  }, [user, showAllDocuments, userProfile?.familyId, familyRefreshKey]); //reload if user changes
 
   // Function to load documents from Firestore
   const loadDocuments = async () => {
@@ -107,7 +107,7 @@ export default function HomeScreen() {
     useCallback(() => {
       console.log("🔄 [Home] Screen focused, reloading documents...");
       loadDocuments();
-    }, [user, showAllDocuments])
+    }, [user, showAllDocuments, userProfile?.familyId, familyRefreshKey])
   );
 
   // pull-to-refresh

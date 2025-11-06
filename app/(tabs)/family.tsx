@@ -41,7 +41,7 @@ import { Family } from '../types/family';
 // ============================================
 export default function FamilyScreen() {
   // Get user info from AuthContext
-  const { user, userProfile, refreshUserProfile, showAllDocuments, setShowAllDocuments } = useAuth();
+  const { user, userProfile, refreshUserProfile, showAllDocuments, setShowAllDocuments, triggerFamilyRefresh} = useAuth();
 
   // State
   const [family, setFamily] = useState<Family | null>(null);
@@ -114,6 +114,7 @@ export default function FamilyScreen() {
         userName: userProfile.name || user.email || 'Unknown',
         userEmail: user.email || '',
       });
+      triggerFamilyRefresh();
 
       console.log('✅ Family created:', newFamily);
 
@@ -171,6 +172,7 @@ export default function FamilyScreen() {
         userName: userProfile.name || user.email || 'Unknown',
         userEmail: user.email || '',
       });
+      triggerFamilyRefresh();
 
       console.log('✅ Joined family:', joinedFamily.name);
 
@@ -247,7 +249,7 @@ export default function FamilyScreen() {
               console.log('🔵 Removing member:', memberId);
               
               await removeMember(user.uid, family.id, memberId);
-              
+              triggerFamilyRefresh();
               console.log('✅ Member removed');
               
               // Reload family data
@@ -283,6 +285,7 @@ export default function FamilyScreen() {
               console.log('🔵 Leaving family...');
               
               await leaveFamily(user.uid, family.id);
+              triggerFamilyRefresh();
               
               console.log('✅ Left family');
               
