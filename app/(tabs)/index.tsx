@@ -7,7 +7,7 @@ import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker"; // You'll need to install this
 import { useRouter } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { getUserDocuments } from "../services/documentService";
+import { getUserAndFamilyDocuments, getUserDocuments } from "../services/documentService";
 import { convertImageToBase64 } from "../services/storageService";
 import { Document } from "../types/document";
 
@@ -53,7 +53,7 @@ import { styles } from "./index.styles";
 
 export default function HomeScreen() {
   const router = useRouter();
-  const { user, logout } = useAuth();
+  const { user, logout, userProfile, showAllDocuments} = useAuth();
 
   const [documents, setDocuments] = useState<Document[]>([]);
   const [loading, setLoading] = useState(true);
@@ -72,7 +72,7 @@ export default function HomeScreen() {
 
   useEffect(() => {
     loadDocuments();
-  }, [user]); //reload if user changes
+  }, [user, showAllDocuments]); //reload if user changes
 
   // Function to load documents from Firestore
   const loadDocuments = async () => {
@@ -85,7 +85,14 @@ export default function HomeScreen() {
       console.log("📖 [Home] Loading documents for user:", user.uid);
       setLoading(true);
 
-      const docs = await getUserDocuments(user.uid);
+      let docs;
+      console.log("Show all documetns: ", showAllDocuments);
+      if (!showAllDocuments) {
+        docs = await getUserDocuments(user.uid);
+      }
+      else {
+        docs = await getUserAndFamilyDocuments(user.uid, userProfile?.familyId);
+      }
       console.log("✅ [Home] Loaded", docs.length, "documents");
       setDocuments(docs);
     } catch (error) {
@@ -100,7 +107,7 @@ export default function HomeScreen() {
     useCallback(() => {
       console.log("🔄 [Home] Screen focused, reloading documents...");
       loadDocuments();
-    }, [user])
+    }, [user, showAllDocuments])
   );
 
   // pull-to-refresh
@@ -257,7 +264,7 @@ export default function HomeScreen() {
           tags: [],
           imageUrl: base64Image,
           isDraft: true,
-        });
+        }, userProfile ?? undefined); 
 
         console.log("✅ Document created:", documentId);
 
@@ -389,14 +396,17 @@ export default function HomeScreen() {
         // ❌ NO ALERT HERE! Just create document silently
 
         // Create document
-        const documentId = await createDocument({
-          userId: userId,
-          title: "",
-          category: "other",
-          tags: [],
-          imageUrl: base64Image,
-          isDraft: true,
-        });
+        const documentId = await createDocument(
+          {
+            userId: userId,
+            title: "",
+            category: "other",
+            tags: [],
+            imageUrl: base64Image,
+            isDraft: true,
+          },
+          userProfile ?? undefined
+        );
 
         // ❌ NO ALERT HERE! Just process silently
 

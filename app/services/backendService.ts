@@ -4,7 +4,7 @@
  * Handles communication with FastAPI backend for AI processing
  */
 
-const BACKEND_URL = 'http://10.90.87.46:8000';
+const BACKEND_URL = 'http://192.168.68.138:8000';
 
 /**
  * Response from backend /api/process-document endpoint

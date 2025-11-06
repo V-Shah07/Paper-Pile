@@ -48,9 +48,7 @@ export const createDocument = async (
       extractedText: null,            //filled later by backend
       summary: null,                  //filled later by backend
       
-      // ============================================
       // NEW: FAMILY-RELATED FIELDS
-      // ============================================
       familyId: userProfile?.familyId || null,  // Set to user's family (or null if no family)
       uploadedBy: userProfile?.name || userProfile?.email || 'Unknown',  // User's name for display
       isSensitive: false,  // Default to NOT sensitive (user can change later)
@@ -152,5 +150,91 @@ export const deleteDocument = async (documentId: string): Promise<void> => {
   } catch (error) {
     console.error('❌ [Firestore] Delete failed:', error);
     throw error;
+  }
+};
+
+/**
+ * Get documents for user + their family (respecting sensitive flag)
+ * 
+ * @param userId - Current user's ID
+ * @param familyId - Current user's family ID (or null if no family)
+ * @returns Array of documents (user's + family's non-sensitive docs)
+ */
+export const getUserAndFamilyDocuments = async (
+  userId: string,
+  familyId: string | null | undefined
+): Promise<Document[]> => {
+  try {
+    console.log('📖 [Firestore] Fetching documents for user + family...');
+    console.log('📖 [Firestore] UserId:', userId);
+    console.log('📖 [Firestore] FamilyId:', familyId);
+    
+    const documents: Document[] = [];
+    
+    // Get user's own documents (always show, including sensitive)
+    const userQuery = query(
+      collection(db, 'documents'),
+      where('userId', '==', userId),
+      orderBy('dateAdded', 'desc')
+    );
+    
+    const userSnapshot = await getDocs(userQuery);
+    userSnapshot.forEach((doc) => {
+      documents.push({
+        id: doc.id,
+        ...doc.data()
+      } as Document);
+    });
+    
+    console.log('✅ [Firestore] Found', userSnapshot.size, 'user documents');
+    
+    // Get family documents (if user is in a family)
+    if (familyId) {
+      console.log('👥 [Firestore] User is in a family, fetching family docs...');
+      
+      // Get all documents in this family that:
+      // 1. Are NOT uploaded by current user (already got those)
+      // 2. Are NOT marked as sensitive
+      const familyQuery = query(
+        collection(db, 'documents'),
+        where('familyId', '==', familyId),
+        where('userId', '!=', userId), // Exclude user's own docs (already added)
+        orderBy('userId'), // Required for != query
+        orderBy('dateAdded', 'desc')
+      );
+      
+      const familySnapshot = await getDocs(familyQuery);
+      
+      // Filter out sensitive documents
+      familySnapshot.forEach((doc) => {
+        const data = doc.data() as Omit<Document, 'id'>;
+        
+        // Only add if NOT sensitive
+        if (!data.isSensitive) {
+          documents.push({
+            id: doc.id,
+            ...data
+          } as Document);
+        }
+      });
+      
+      console.log('✅ [Firestore] Found', familySnapshot.size, 'family documents (filtered sensitive)');
+    } else {
+      console.log('ℹ️  [Firestore] User not in a family, skipping family docs');
+    }
+    
+    // sort all documents by date (newest first)
+    documents.sort((a, b) => {
+      const dateA = new Date(a.dateAdded).getTime();
+      const dateB = new Date(b.dateAdded).getTime();
+      return dateB - dateA; // Descending order
+    });
+    
+    console.log('✅ [Firestore] Total documents:', documents.length);
+    
+    return documents;
+  } catch (error) {
+    console.error('❌ [Firestore] Fetch failed:', error);
+    throw new Error('Failed to load documents. Please try again.');
   }
 };

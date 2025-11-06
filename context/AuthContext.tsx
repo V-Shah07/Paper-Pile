@@ -25,6 +25,8 @@ interface AuthContextType {
   user: User | null;
   userProfile: UserProfile | null;
   loading: boolean;
+  showAllDocuments: boolean;
+  setShowAllDocuments: (value: boolean) => void;
   signup: (email: string, password: string, name: string) => Promise<void>;
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
@@ -42,6 +44,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [showAllDocuments, setShowAllDocuments] = useState(true);
 
   const loadUserProfile = async (userId: string) => {
     try {
@@ -193,11 +196,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     user,
     userProfile,
     loading,
+    showAllDocuments,
+    setShowAllDocuments,
     signup,
     login,
     logout,
     resetPassword,
-    refreshUserProfile
+    refreshUserProfile,
   };
 
   return (

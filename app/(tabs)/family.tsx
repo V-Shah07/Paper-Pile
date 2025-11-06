@@ -41,12 +41,11 @@ import { Family } from '../types/family';
 // ============================================
 export default function FamilyScreen() {
   // Get user info from AuthContext
-  const { user, userProfile, refreshUserProfile } = useAuth();
+  const { user, userProfile, refreshUserProfile, showAllDocuments, setShowAllDocuments } = useAuth();
 
   // State
   const [family, setFamily] = useState<Family | null>(null);
   const [loading, setLoading] = useState(true);
-  const [showAllDocuments, setShowAllDocuments] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showJoinModal, setShowJoinModal] = useState(false);
   const [showInviteModal, setShowInviteModal] = useState(false);

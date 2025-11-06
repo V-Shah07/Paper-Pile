@@ -40,7 +40,7 @@ import { DocumentInput } from "../types/document";
 export default function EditDetailsScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
-  const { user } = useAuth();
+  const { user, userProfile } = useAuth();
 
   const imageUri = params.imageUri as string;
   const documentId = params.documentId as string;
@@ -213,7 +213,7 @@ export default function EditDetailsScreen() {
           userId: user?.uid || "default-user",
           imageUrl: imageUri,
           ...documentData,
-        });
+        }, userProfile ?? undefined);
       }
 
       setIsProcessing(false);
