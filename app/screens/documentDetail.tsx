@@ -134,6 +134,7 @@ export default function DocumentDetailScreen() {
         imageUri: document.imageUrl,
         documentId: document.id,
         isEditing: "true",
+        owner: isOwner ? "true" : "false",
       },
     });
   };

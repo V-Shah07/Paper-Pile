@@ -45,6 +45,7 @@ export default function EditDetailsScreen() {
   const imageUri = params.imageUri as string;
   const documentId = params.documentId as string;
   const isEditing = params.isEditing === "true";
+  const owner = params.owner as string | undefined;
 
   // State
   const [isProcessing, setIsProcessing] = useState(false);
@@ -209,11 +210,14 @@ export default function EditDetailsScreen() {
       } else {
         // This should rarely happen now, but keep as fallback
         // If somehow no documentId, create new
-        const newDocId = await createDocument({
-          userId: user?.uid || "default-user",
-          imageUrl: imageUri,
-          ...documentData,
-        }, userProfile ?? undefined);
+        const newDocId = await createDocument(
+          {
+            userId: user?.uid || "default-user",
+            imageUrl: imageUri,
+            ...documentData,
+          },
+          userProfile ?? undefined
+        );
       }
 
       setIsProcessing(false);
@@ -475,32 +479,34 @@ export default function EditDetailsScreen() {
         </View>
 
         {/* ✅ NEW: Mark as Sensitive Toggle */}
-        <View style={styles.section}>
-          <View style={styles.sensitiveRow}>
-            <View style={styles.sensitiveInfo}>
-              <View style={styles.sensitiveLabelRow}>
-                <Ionicons
-                  name={isSensitive ? "lock-closed" : "lock-open-outline"}
-                  size={20}
-                  color={isSensitive ? Colors.error : Colors.textSecondary}
-                />
-                <Text style={styles.sectionLabel}>Mark as Sensitive</Text>
+        {owner === "true" && (
+          <View style={styles.section}>
+            <View style={styles.sensitiveRow}>
+              <View style={styles.sensitiveInfo}>
+                <View style={styles.sensitiveLabelRow}>
+                  <Ionicons
+                    name={isSensitive ? "lock-closed" : "lock-open-outline"}
+                    size={20}
+                    color={isSensitive ? Colors.error : Colors.textSecondary}
+                  />
+                  <Text style={styles.sectionLabel}>Mark as Sensitive</Text>
+                </View>
+                <Text style={styles.helperText}>
+                  {isSensitive
+                    ? "Hidden from other family members"
+                    : "Visible to all family members"}
+                </Text>
               </View>
-              <Text style={styles.helperText}>
-                {isSensitive
-                  ? "Hidden from other family members"
-                  : "Visible to all family members"}
-              </Text>
+              <Switch
+                value={isSensitive}
+                onValueChange={setIsSensitive}
+                trackColor={{ false: Colors.border, true: Colors.error }}
+                thumbColor={Colors.background}
+                ios_backgroundColor={Colors.border}
+              />
             </View>
-            <Switch
-              value={isSensitive}
-              onValueChange={setIsSensitive}
-              trackColor={{ false: Colors.border, true: Colors.error }}
-              thumbColor={Colors.background}
-              ios_backgroundColor={Colors.border}
-            />
           </View>
-        </View>
+        )}
 
         {/* Notes Input */}
         <View style={styles.section}>

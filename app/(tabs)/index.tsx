@@ -7,7 +7,10 @@ import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker"; // You'll need to install this
 import { useRouter } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { getUserAndFamilyDocuments, getUserDocuments } from "../services/documentService";
+import {
+  getUserAndFamilyDocuments,
+  getUserDocuments,
+} from "../services/documentService";
 import { convertImageToBase64 } from "../services/storageService";
 import { Document } from "../types/document";
 
@@ -53,7 +56,8 @@ import { styles } from "./index.styles";
 
 export default function HomeScreen() {
   const router = useRouter();
-  const { user, logout, userProfile, showAllDocuments, familyRefreshKey} = useAuth();
+  const { user, logout, userProfile, showAllDocuments, familyRefreshKey } =
+    useAuth();
 
   const [documents, setDocuments] = useState<Document[]>([]);
   const [loading, setLoading] = useState(true);
@@ -89,8 +93,7 @@ export default function HomeScreen() {
       console.log("Show all documetns: ", showAllDocuments);
       if (!showAllDocuments) {
         docs = await getUserDocuments(user.uid);
-      }
-      else {
+      } else {
         docs = await getUserAndFamilyDocuments(user.uid, userProfile?.familyId);
       }
       console.log("✅ [Home] Loaded", docs.length, "documents");
@@ -257,14 +260,17 @@ export default function HomeScreen() {
         const userId = user.uid;
 
         // Create document
-        const documentId = await createDocument({
-          userId: userId,
-          title: "",
-          category: "other",
-          tags: [],
-          imageUrl: base64Image,
-          isDraft: true,
-        }, userProfile ?? undefined); 
+        const documentId = await createDocument(
+          {
+            userId: userId,
+            title: "",
+            category: "other",
+            tags: [],
+            imageUrl: base64Image,
+            isDraft: true,
+          },
+          userProfile ?? undefined
+        );
 
         console.log("✅ Document created:", documentId);
 
@@ -293,7 +299,11 @@ export default function HomeScreen() {
                   onPress: () => {
                     router.push({
                       pathname: "/screens/editDetails",
-                      params: { imageUri: asset.uri, documentId: documentId },
+                      params: {
+                        imageUri: asset.uri,
+                        documentId: documentId,
+                        owner: "true",
+                      },
                     });
                   },
                 },
@@ -318,6 +328,7 @@ export default function HomeScreen() {
               suggestedTitle: aiResult.suggested_title,
               suggestedCategory: aiResult.category,
               suggestedTags: JSON.stringify(aiResult.suggested_tags),
+              owner: "true",
             },
           });
         } catch (error) {
@@ -330,7 +341,11 @@ export default function HomeScreen() {
               onPress: () => {
                 router.push({
                   pathname: "/screens/editDetails",
-                  params: { imageUri: asset.uri, documentId: documentId },
+                  params: {
+                    imageUri: asset.uri,
+                    documentId: documentId,
+                    owner: "true",
+                  },
                 });
               },
             },
@@ -434,7 +449,11 @@ export default function HomeScreen() {
                   onPress: () => {
                     router.push({
                       pathname: "/screens/editDetails",
-                      params: { imageUri: asset.uri, documentId: documentId },
+                      params: {
+                        imageUri: asset.uri,
+                        documentId: documentId,
+                        owner: "true",
+                      },
                     });
                   },
                 },
@@ -459,6 +478,7 @@ export default function HomeScreen() {
               suggestedTitle: aiResult.suggested_title,
               suggestedCategory: aiResult.category,
               suggestedTags: JSON.stringify(aiResult.suggested_tags),
+              owner: "true",
             },
           });
         } catch (error) {
@@ -472,7 +492,11 @@ export default function HomeScreen() {
               onPress: () => {
                 router.push({
                   pathname: "/screens/editDetails",
-                  params: { imageUri: asset.uri, documentId: documentId },
+                  params: {
+                    imageUri: asset.uri,
+                    documentId: documentId,
+                    owner: "true",
+                  },
                 });
               },
             },
