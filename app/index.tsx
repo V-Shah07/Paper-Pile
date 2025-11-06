@@ -4,6 +4,8 @@ import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { Colors } from '@/constants/theme';
 import { useAuth } from '@/context/AuthContext';
 
+import { LogBox } from "react-native";
+LogBox.ignoreAllLogs(true);
 export default function Index() {
   const router = useRouter();
   const { user, loading } = useAuth();

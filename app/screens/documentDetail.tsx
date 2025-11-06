@@ -73,7 +73,7 @@ export default function DocumentDetailScreen() {
 
       if (docSnap.exists()) {
         const docData = { id: docSnap.id, ...docSnap.data() } as Document;
-        console.log("✅ [DocumentDetail] Document loaded:", docData);
+        //console.log("✅ [DocumentDetail] Document loaded:", docData);
         setDocument(docData);
       } else {
         console.error("❌ [DocumentDetail] Document not found");
@@ -127,6 +127,14 @@ export default function DocumentDetailScreen() {
   const handleEdit = () => {
     if (!document) return;
 
+    if (!isOwner) {
+      Alert.alert(
+        "Not Allowed",
+        "Only the document owner can edit the document."
+      );
+      return;
+    }
+
     console.log("Edit document:", document.id);
     router.push({
       pathname: "/screens/editDetails",
@@ -150,7 +158,7 @@ export default function DocumentDetailScreen() {
     if (!isOwner) {
       Alert.alert(
         'Not Allowed',
-        'Only the document owner can change sensitive status.'
+        'Only the document owner can delete this.'
       );
       return;
     }
@@ -330,8 +338,8 @@ export default function DocumentDetailScreen() {
           <TouchableOpacity onPress={handleShare} style={styles.headerButton}>
             <Ionicons name="share-outline" size={24} color={Colors.text} />
           </TouchableOpacity>
-          <TouchableOpacity onPress={handleEdit} style={styles.headerButton}>
-            <Ionicons name="create-outline" size={24} color={Colors.text} />
+          <TouchableOpacity onPress={handleEdit} style={[styles.headerButton, !isOwner && styles.actionButtonDisabled]} >
+            <Ionicons name="create-outline" size={24} color={!isOwner ? Colors.disabled: Colors.text} />
           </TouchableOpacity>
         </View>
       </View>

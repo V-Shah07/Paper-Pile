@@ -1,15 +1,15 @@
 /**
  * Profile/Settings Screen
- * 
+ *
  * User account management, preferences, and app settings.
  * Shows user info, notification settings, storage usage, and support options.
- * 
+ *
  * USAGE:
  * - Place in app/(tabs) folder as a tab screen
  * - For now uses dummy data, replace with API calls later
  */
 
-import React, { useState } from 'react';
+import React, { useState } from "react";
 import {
   View,
   Text,
@@ -19,22 +19,24 @@ import {
   Alert,
   Linking,
   Image,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
-import * as ImagePicker from 'expo-image-picker';
-import { Colors } from '@/constants/theme';
-import { styles } from './profile.styles';
-import { getAuth } from 'firebase/auth';
-import { useAuth } from '@/context/AuthContext';
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { Ionicons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
+import * as ImagePicker from "expo-image-picker";
+import { Colors } from "@/constants/theme";
+import { styles } from "./profile.styles";
+import { deleteUser, getAuth } from "firebase/auth";
+import { useAuth } from "@/context/AuthContext";
+import { auth, db } from "@/config/firebase";
+import { deleteDoc, doc } from "firebase/firestore";
 
 // Dummy user data - replace with API/context later
 const DUMMY_USER = {
-  name: 'John Doe',
-  email: 'john.doe@example.com',
-  avatar: 'JD',
-  memberSince: '2024-01-15',
+  name: "John Doe",
+  email: "john.doe@example.com",
+  avatar: "JD",
+  memberSince: "2024-01-15",
   documentsCount: 12,
   storageUsed: 2.4, // GB
   storageLimit: 5, // GB
@@ -44,14 +46,16 @@ const DUMMY_USER = {
 export default function ProfileScreen() {
   const router = useRouter();
 
-  const {user, logout} = useAuth();
+  const { user, logout } = useAuth();
 
   const userName = user?.displayName || DUMMY_USER.name;
   const userEmail = user?.email || DUMMY_USER.email;
   const userPhoto = user?.photoURL || null;
 
   // User photo state
-  const [profilePhoto, setProfilePhoto] = useState<string | null>(DUMMY_USER.photoUrl);
+  const [profilePhoto, setProfilePhoto] = useState<string | null>(
+    DUMMY_USER.photoUrl
+  );
 
   // Notification settings state
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
@@ -59,180 +63,221 @@ export default function ProfileScreen() {
   const [familyUpdates, setFamilyUpdates] = useState(true);
 
   // Calculate storage percentage
-  const storagePercentage = (DUMMY_USER.storageUsed / DUMMY_USER.storageLimit) * 100;
+  const storagePercentage =
+    (DUMMY_USER.storageUsed / DUMMY_USER.storageLimit) * 100;
 
   // Handle change profile photo
   const handleChangePhoto = async () => {
-    Alert.alert(
-      'Change Profile Photo',
-      'Choose a source',
-      [
-        {
-          text: 'Take Photo',
-          onPress: async () => {
-            // Request camera permission
-            const { status } = await ImagePicker.requestCameraPermissionsAsync();
-            
-            if (status !== 'granted') {
-              Alert.alert('Permission Denied', 'Camera permission is required to take a photo');
-              return;
-            }
+    Alert.alert("Change Profile Photo", "Choose a source", [
+      {
+        text: "Take Photo",
+        onPress: async () => {
+          // Request camera permission
+          const { status } = await ImagePicker.requestCameraPermissionsAsync();
 
-            // Launch camera
-            const result = await ImagePicker.launchCameraAsync({
-              allowsEditing: true,
-              aspect: [1, 1],
-              quality: 0.8,
-            });
+          if (status !== "granted") {
+            Alert.alert(
+              "Permission Denied",
+              "Camera permission is required to take a photo"
+            );
+            return;
+          }
 
-            if (!result.canceled && result.assets[0]) {
-              setProfilePhoto(result.assets[0].uri);
-              // TODO: Upload to server
-              console.log('New photo selected:', result.assets[0].uri);
-            }
-          },
-        },
-        {
-          text: 'Choose from Library',
-          onPress: async () => {
-            // Request media library permission
-            const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-            
-            if (status !== 'granted') {
-              Alert.alert('Permission Denied', 'Photos permission is required to select a photo');
-              return;
-            }
+          // Launch camera
+          const result = await ImagePicker.launchCameraAsync({
+            allowsEditing: true,
+            aspect: [1, 1],
+            quality: 0.8,
+          });
 
-            // Launch image picker
-            const result = await ImagePicker.launchImageLibraryAsync({
-              mediaTypes: ImagePicker.MediaTypeOptions.Images,
-              allowsEditing: true,
-              aspect: [1, 1],
-              quality: 0.8,
-            });
+          if (!result.canceled && result.assets[0]) {
+            setProfilePhoto(result.assets[0].uri);
+            // TODO: Upload to server
+            console.log("New photo selected:", result.assets[0].uri);
+          }
+        },
+      },
+      {
+        text: "Choose from Library",
+        onPress: async () => {
+          // Request media library permission
+          const { status } =
+            await ImagePicker.requestMediaLibraryPermissionsAsync();
 
-            if (!result.canceled && result.assets[0]) {
-              setProfilePhoto(result.assets[0].uri);
-              // TODO: Upload to server
-              console.log('New photo selected:', result.assets[0].uri);
-            }
-          },
+          if (status !== "granted") {
+            Alert.alert(
+              "Permission Denied",
+              "Photos permission is required to select a photo"
+            );
+            return;
+          }
+
+          // Launch image picker
+          const result = await ImagePicker.launchImageLibraryAsync({
+            mediaTypes: ImagePicker.MediaTypeOptions.Images,
+            allowsEditing: true,
+            aspect: [1, 1],
+            quality: 0.8,
+          });
+
+          if (!result.canceled && result.assets[0]) {
+            setProfilePhoto(result.assets[0].uri);
+            // TODO: Upload to server
+            console.log("New photo selected:", result.assets[0].uri);
+          }
         },
-        {
-          text: 'Remove Photo',
-          style: 'destructive',
-          onPress: () => {
-            setProfilePhoto(null);
-            // TODO: Delete from server
-            console.log('Photo removed');
-          },
+      },
+      {
+        text: "Remove Photo",
+        style: "destructive",
+        onPress: () => {
+          setProfilePhoto(null);
+          // TODO: Delete from server
+          console.log("Photo removed");
         },
-        {
-          text: 'Cancel',
-          style: 'cancel',
-        },
-      ]
-    );
+      },
+      {
+        text: "Cancel",
+        style: "cancel",
+      },
+    ]);
   };
 
   // Handle edit profile
   const handleEditProfile = () => {
-    Alert.alert('Edit Profile', 'Profile editing coming soon!');
+    Alert.alert("Edit Profile", "Profile editing coming soon!");
     // TODO: Navigate to edit profile screen
   };
 
   // Handle manage subscription
   const handleManageSubscription = () => {
-    Alert.alert('Manage Subscription', 'Subscription management coming soon!');
+    Alert.alert("Manage Subscription", "Subscription management coming soon!");
     // TODO: Navigate to subscription screen or open payment portal
   };
 
   // Handle export data
   const handleExportData = () => {
     Alert.alert(
-      'Export Data',
-      'This will create a ZIP file with all your documents and data. Continue?',
+      "Export Data",
+      "This will create a ZIP file with all your documents and data. Continue?",
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: "Cancel", style: "cancel" },
         {
-          text: 'Export',
+          text: "Export",
           onPress: () => {
             // TODO: Call export API
-            Alert.alert('Success', 'Your data export has been started. You will receive an email when it\'s ready.');
+            Alert.alert(
+              "Success",
+              "Your data export has been started. You will receive an email when it's ready."
+            );
           },
         },
       ]
     );
+  };
+
+  const deleteAccount = async () => {
+    try {
+      const currentUser = auth.currentUser;
+      if (!currentUser) throw new Error("No authenticated user");
+
+      // Optional: remove user profile doc from Firestore
+      await deleteDoc(doc(db, "users", currentUser.uid));
+
+      // Optional: remove user’s documents, families, etc. (if you want cleanup)
+      // Example: await deleteUserDocuments(currentUser.uid);
+
+      // Delete auth account
+      await deleteUser(currentUser);
+
+      console.log("✅ Account deleted");
+    } catch (error: any) {
+      if (error.code === "auth/requires-recent-login") {
+        Alert.alert(
+          "Session expired",
+          "Please log in again to delete your account."
+        );
+      } else {
+        console.error("❌ Error deleting account:", error);
+        throw error;
+      }
+    }
   };
 
   // Handle help & support
   const handleHelp = () => {
     // Open help center or email
-    Linking.openURL('mailto:support@paperpile.app?subject=Help Request');
+    Linking.openURL("mailto:support@paperpile.app?subject=Help Request");
   };
 
   // Handle privacy policy
   const handlePrivacy = () => {
-    Linking.openURL('https://paperpile.app/privacy');
+    Linking.openURL("https://paperpile.app/privacy");
   };
 
   // Handle terms of service
   const handleTerms = () => {
-    Linking.openURL('https://paperpile.app/terms');
+    Linking.openURL("https://paperpile.app/terms");
   };
 
   // Handle about
   const handleAbout = () => {
     Alert.alert(
-      'Paper Pile',
-      'Version 1.0.0\n\nYour family\'s important documents, organized and searchable.\n\n© 2024 Paper Pile',
-      [{ text: 'OK' }]
+      "Paper Pile",
+      "Version 1.0.0\n\nYour family's important documents, organized and searchable.\n\n© 2024 Paper Pile",
+      [{ text: "OK" }]
     );
   };
 
   // Handle logout
   const handleLogout = () => {
-    Alert.alert(
-      'Log Out',
-      'Are you sure you want to log out?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Log Out',
-          style: 'destructive',
-          onPress: () => {
-            // TODO: Clear user session, navigate to auth
-            console.log('Logging out...');
-            Alert.alert('Logged Out', 'You have been logged out successfully');
-          },
+    Alert.alert("Log Out", "Are you sure you want to log out?", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Log Out",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            console.log("🔵 Logging out...");
+            await logout();
+            console.log("✅ Logged out");
+            router.replace("/auth/welcome");
+
+            Alert.alert("Logged Out", "You have been logged out successfully");
+          } catch (error: any) {
+            console.error("❌ Logout failed:", error);
+            Alert.alert("Error", error.message || "Failed to log out");
+          }
         },
-      ]
-    );
+      },
+    ]);
   };
 
   // Handle delete account
   const handleDeleteAccount = () => {
     Alert.alert(
-      'Delete Account',
-      'This will permanently delete your account and all your data. This action cannot be undone. Are you absolutely sure?',
+      "Delete Account",
+      "This will permanently delete your account and all your data. This action cannot be undone. Are you absolutely sure?",
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: "Cancel", style: "cancel" },
         {
-          text: 'Delete Account',
-          style: 'destructive',
+          text: "Delete Account",
+          style: "destructive",
           onPress: () => {
             // Show confirmation again
             Alert.alert(
-              'Final Confirmation',
-              'Type DELETE to confirm account deletion',
+              "Final Confirmation",
+              "Please confirm account deletion",
               [
-                { text: 'Cancel', style: 'cancel' },
+                { text: "Cancel", style: "cancel" },
                 {
-                  text: 'Confirm',
-                  style: 'destructive',
+                  text: "Confirm",
+                  style: "destructive",
                   onPress: () => {
                     // TODO: Call delete account API
-                    console.log('Deleting account...');
+                    console.log("Deleting account...");
+                    deleteAccount();
+                    router.replace("/auth/welcome");
                   },
                 },
               ]
@@ -246,9 +291,9 @@ export default function ProfileScreen() {
   // Format date helper
   const formatDate = (isoDate: string): string => {
     const date = new Date(isoDate);
-    return date.toLocaleDateString('en-US', {
-      month: 'long',
-      year: 'numeric',
+    return date.toLocaleDateString("en-US", {
+      month: "long",
+      year: "numeric",
     });
   };
 
@@ -259,26 +304,28 @@ export default function ProfileScreen() {
         <Text style={styles.headerTitle}>Profile</Text>
       </View>
 
-      <ScrollView 
-        style={styles.content}
-        showsVerticalScrollIndicator={false}
-      >
+      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* User Profile Card */}
         <View style={styles.profileCard}>
           {/* Avatar */}
           <View style={styles.avatarContainer}>
             {profilePhoto ? (
-              <Image 
-                source={{ uri: profilePhoto }} 
+              <Image
+                source={{ uri: profilePhoto }}
                 style={styles.avatarImage}
               />
             ) : (
               <View style={styles.avatar}>
-                <Text style={styles.avatarText}>{userName.split(' ').map(name => 
-                  name.charAt(0)).join('').toUpperCase()}</Text>
+                <Text style={styles.avatarText}>
+                  {userName
+                    .split(" ")
+                    .map((name) => name.charAt(0))
+                    .join("")
+                    .toUpperCase()}
+                </Text>
               </View>
             )}
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.editAvatarButton}
               onPress={handleChangePhoto}
             >
@@ -315,21 +362,22 @@ export default function ProfileScreen() {
                 {Math.round(storagePercentage)}%
               </Text>
             </View>
-            
+
             {/* Storage Progress Bar */}
             <View style={styles.progressBar}>
-              <View 
+              <View
                 style={[
                   styles.progressFill,
-                  { 
+                  {
                     width: `${storagePercentage}%`,
-                    backgroundColor: storagePercentage > 80 
-                      ? Colors.error 
-                      : storagePercentage > 60 
-                      ? Colors.warning 
-                      : Colors.success 
-                  }
-                ]} 
+                    backgroundColor:
+                      storagePercentage > 80
+                        ? Colors.error
+                        : storagePercentage > 60
+                        ? Colors.warning
+                        : Colors.success,
+                  },
+                ]}
               />
             </View>
 
@@ -342,7 +390,7 @@ export default function ProfileScreen() {
         {/* Notifications Section */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Notifications</Text>
-          
+
           <View style={styles.settingCard}>
             <View style={styles.settingItem}>
               <View style={styles.settingInfo}>
@@ -355,7 +403,9 @@ export default function ProfileScreen() {
                 value={notificationsEnabled}
                 onValueChange={setNotificationsEnabled}
                 trackColor={{ false: Colors.border, true: Colors.primaryLight }}
-                thumbColor={notificationsEnabled ? Colors.primary : Colors.disabled}
+                thumbColor={
+                  notificationsEnabled ? Colors.primary : Colors.disabled
+                }
               />
             </View>
 
@@ -400,7 +450,7 @@ export default function ProfileScreen() {
         {/* Account Section */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Account</Text>
-          
+
           <View style={styles.menuCard}>
             {/* Manage Subscription */}
             <TouchableOpacity
@@ -408,10 +458,18 @@ export default function ProfileScreen() {
               onPress={handleManageSubscription}
             >
               <View style={styles.menuItemLeft}>
-                <Ionicons name="card-outline" size={22} color={Colors.textSecondary} />
+                <Ionicons
+                  name="card-outline"
+                  size={22}
+                  color={Colors.textSecondary}
+                />
                 <Text style={styles.menuItemText}>Manage Subscription</Text>
               </View>
-              <Ionicons name="chevron-forward" size={20} color={Colors.textLight} />
+              <Ionicons
+                name="chevron-forward"
+                size={20}
+                color={Colors.textLight}
+              />
             </TouchableOpacity>
 
             <View style={styles.divider} />
@@ -422,10 +480,18 @@ export default function ProfileScreen() {
               onPress={handleExportData}
             >
               <View style={styles.menuItemLeft}>
-                <Ionicons name="download-outline" size={22} color={Colors.textSecondary} />
+                <Ionicons
+                  name="download-outline"
+                  size={22}
+                  color={Colors.textSecondary}
+                />
                 <Text style={styles.menuItemText}>Export Data</Text>
               </View>
-              <Ionicons name="chevron-forward" size={20} color={Colors.textLight} />
+              <Ionicons
+                name="chevron-forward"
+                size={20}
+                color={Colors.textLight}
+              />
             </TouchableOpacity>
           </View>
         </View>
@@ -433,60 +499,80 @@ export default function ProfileScreen() {
         {/* Support Section */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Support</Text>
-          
+
           <View style={styles.menuCard}>
             {/* Help & Support */}
-            <TouchableOpacity
-              style={styles.menuItem}
-              onPress={handleHelp}
-            >
+            <TouchableOpacity style={styles.menuItem} onPress={handleHelp}>
               <View style={styles.menuItemLeft}>
-                <Ionicons name="help-circle-outline" size={22} color={Colors.textSecondary} />
+                <Ionicons
+                  name="help-circle-outline"
+                  size={22}
+                  color={Colors.textSecondary}
+                />
                 <Text style={styles.menuItemText}>Help & Support</Text>
               </View>
-              <Ionicons name="chevron-forward" size={20} color={Colors.textLight} />
+              <Ionicons
+                name="chevron-forward"
+                size={20}
+                color={Colors.textLight}
+              />
             </TouchableOpacity>
 
             <View style={styles.divider} />
 
             {/* Privacy Policy */}
-            <TouchableOpacity
-              style={styles.menuItem}
-              onPress={handlePrivacy}
-            >
+            <TouchableOpacity style={styles.menuItem} onPress={handlePrivacy}>
               <View style={styles.menuItemLeft}>
-                <Ionicons name="shield-checkmark-outline" size={22} color={Colors.textSecondary} />
+                <Ionicons
+                  name="shield-checkmark-outline"
+                  size={22}
+                  color={Colors.textSecondary}
+                />
                 <Text style={styles.menuItemText}>Privacy Policy</Text>
               </View>
-              <Ionicons name="open-outline" size={18} color={Colors.textLight} />
+              <Ionicons
+                name="open-outline"
+                size={18}
+                color={Colors.textLight}
+              />
             </TouchableOpacity>
 
             <View style={styles.divider} />
 
             {/* Terms of Service */}
-            <TouchableOpacity
-              style={styles.menuItem}
-              onPress={handleTerms}
-            >
+            <TouchableOpacity style={styles.menuItem} onPress={handleTerms}>
               <View style={styles.menuItemLeft}>
-                <Ionicons name="document-text-outline" size={22} color={Colors.textSecondary} />
+                <Ionicons
+                  name="document-text-outline"
+                  size={22}
+                  color={Colors.textSecondary}
+                />
                 <Text style={styles.menuItemText}>Terms of Service</Text>
               </View>
-              <Ionicons name="open-outline" size={18} color={Colors.textLight} />
+              <Ionicons
+                name="open-outline"
+                size={18}
+                color={Colors.textLight}
+              />
             </TouchableOpacity>
 
             <View style={styles.divider} />
 
             {/* About */}
-            <TouchableOpacity
-              style={styles.menuItem}
-              onPress={handleAbout}
-            >
+            <TouchableOpacity style={styles.menuItem} onPress={handleAbout}>
               <View style={styles.menuItemLeft}>
-                <Ionicons name="information-circle-outline" size={22} color={Colors.textSecondary} />
+                <Ionicons
+                  name="information-circle-outline"
+                  size={22}
+                  color={Colors.textSecondary}
+                />
                 <Text style={styles.menuItemText}>About</Text>
               </View>
-              <Ionicons name="chevron-forward" size={20} color={Colors.textLight} />
+              <Ionicons
+                name="chevron-forward"
+                size={20}
+                color={Colors.textLight}
+              />
             </TouchableOpacity>
           </View>
         </View>
@@ -494,15 +580,16 @@ export default function ProfileScreen() {
         {/* Danger Zone */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Danger Zone</Text>
-          
+
           <View style={styles.menuCard}>
             {/* Log Out */}
-            <TouchableOpacity
-              style={styles.menuItem}
-              onPress={handleLogout}
-            >
+            <TouchableOpacity style={styles.menuItem} onPress={handleLogout}>
               <View style={styles.menuItemLeft}>
-                <Ionicons name="log-out-outline" size={22} color={Colors.error} />
+                <Ionicons
+                  name="log-out-outline"
+                  size={22}
+                  color={Colors.error}
+                />
                 <Text style={[styles.menuItemText, { color: Colors.error }]}>
                   Log Out
                 </Text>

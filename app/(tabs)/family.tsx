@@ -1,11 +1,11 @@
 /**
  * Family Screen - UPDATED WITH REAL DATA & UI FIXES
- * 
+ *
  * Connected to Firebase and AuthContext.
  * UI improvements: Better button sizing, no scrolling needed, cleaner layout
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -17,31 +17,43 @@ import {
   Share,
   Platform,
   ActivityIndicator,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
-import { Colors } from '@/constants/theme';
-import { styles } from './family.styles';
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { Ionicons } from "@expo/vector-icons";
+import { Colors } from "@/constants/theme";
+import { styles } from "./family.styles";
 
 // ============================================
 // IMPORTS
 // ============================================
-import { useAuth } from '@/context/AuthContext';
+import { useAuth } from "@/context/AuthContext";
 import {
   createFamily,
   joinFamily,
   leaveFamily,
   removeMember,
   getFamily,
-} from '../services/familyService';
-import { Family } from '../types/family';
+} from "../services/familyService";
+import { Family } from "../types/family";
+
+import {
+  addUserDocumentsToFamily,
+  removeUserDocumentsFromFamily,
+} from "../services/documentService";
 
 // ============================================
 // COMPONENT
 // ============================================
 export default function FamilyScreen() {
   // Get user info from AuthContext
-  const { user, userProfile, refreshUserProfile, showAllDocuments, setShowAllDocuments, triggerFamilyRefresh} = useAuth();
+  const {
+    user,
+    userProfile,
+    refreshUserProfile,
+    showAllDocuments,
+    setShowAllDocuments,
+    triggerFamilyRefresh,
+  } = useAuth();
 
   // State
   const [family, setFamily] = useState<Family | null>(null);
@@ -49,8 +61,8 @@ export default function FamilyScreen() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showJoinModal, setShowJoinModal] = useState(false);
   const [showInviteModal, setShowInviteModal] = useState(false);
-  const [familyName, setFamilyName] = useState('');
-  const [joinCode, setJoinCode] = useState('');
+  const [familyName, setFamilyName] = useState("");
+  const [joinCode, setJoinCode] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
 
   // ============================================
@@ -63,26 +75,26 @@ export default function FamilyScreen() {
   const loadFamilyData = async () => {
     try {
       setLoading(true);
-      
+
       // Check if user has a family
       if (userProfile?.familyId) {
-        console.log('🔵 Loading family data...');
+        console.log("🔵 Loading family data...");
         const familyData = await getFamily(userProfile.familyId);
-        
+
         if (familyData) {
           setFamily(familyData);
-          console.log('✅ Family loaded:', familyData.name);
+          console.log("✅ Family loaded:", familyData.name);
         } else {
-          console.log('⚠️  Family not found');
+          console.log("⚠️  Family not found");
           setFamily(null);
         }
       } else {
-        console.log('ℹ️  User not in a family');
+        console.log("ℹ️  User not in a family");
         setFamily(null);
       }
     } catch (error) {
-      console.error('❌ Error loading family:', error);
-      Alert.alert('Error', 'Failed to load family data');
+      console.error("❌ Error loading family:", error);
+      Alert.alert("Error", "Failed to load family data");
     } finally {
       setLoading(false);
     }
@@ -93,30 +105,30 @@ export default function FamilyScreen() {
   // ============================================
   const handleCreateFamily = async () => {
     if (!familyName.trim()) {
-      Alert.alert('Error', 'Please enter a family name');
+      Alert.alert("Error", "Please enter a family name");
       return;
     }
 
     if (!user || !userProfile) {
-      Alert.alert('Error', 'User not logged in');
+      Alert.alert("Error", "User not logged in");
       return;
     }
 
     setIsProcessing(true);
 
     try {
-      console.log('🔵 Creating family:', familyName);
-      
+      console.log("🔵 Creating family:", familyName);
+
       // Call the real API
       const newFamily = await createFamily({
         name: familyName.trim(),
         userId: user.uid,
-        userName: userProfile.name || user.email || 'Unknown',
-        userEmail: user.email || '',
+        userName: userProfile.name || user.email || "Unknown",
+        userEmail: user.email || "",
       });
       triggerFamilyRefresh();
 
-      console.log('✅ Family created:', newFamily);
+      console.log("✅ Family created:", newFamily);
 
       // Refresh user profile to get updated familyId
       await refreshUserProfile();
@@ -124,23 +136,43 @@ export default function FamilyScreen() {
       // Load the new family data
       await loadFamilyData();
 
+      const currentFamilyId = newFamily.id;
+      if (!currentFamilyId) {
+        console.warn("No familyId found after join. Skipping share prompt.");
+        return;
+      }
+
+      Alert.alert(
+        "Share Existing Documents?",
+        `Would you like to share your existing documents with your new family?`,
+        [
+          { text: "Keep Private", style: "cancel" },
+          {
+            text: "Share with Family",
+            onPress: async () => {
+              await addUserDocumentsToFamily(user.uid, currentFamilyId);
+            },
+          },
+        ]
+      );
+
       // Show success
       Alert.alert(
-        'Family Created! 🎉',
+        "Family Created! 🎉",
         `"${familyName}" has been created.\n\nInvite Code: ${newFamily.inviteCode}\n\nShare this code with family members so they can join.`,
         [
           {
-            text: 'OK',
+            text: "OK",
             onPress: () => {
               setShowCreateModal(false);
-              setFamilyName('');
+              setFamilyName("");
             },
           },
         ]
       );
     } catch (error: any) {
-      console.error('❌ Error creating family:', error);
-      Alert.alert('Error', error.message || 'Failed to create family');
+      console.error("❌ Error creating family:", error);
+      Alert.alert("Error", error.message || "Failed to create family");
     } finally {
       setIsProcessing(false);
     }
@@ -151,30 +183,30 @@ export default function FamilyScreen() {
   // ============================================
   const handleJoinFamily = async () => {
     if (!joinCode.trim()) {
-      Alert.alert('Error', 'Please enter an invite code');
+      Alert.alert("Error", "Please enter an invite code");
       return;
     }
 
     if (!user || !userProfile) {
-      Alert.alert('Error', 'User not logged in');
+      Alert.alert("Error", "User not logged in");
       return;
     }
 
     setIsProcessing(true);
 
     try {
-      console.log('🔵 Joining family with code:', joinCode);
-      
+      console.log("🔵 Joining family with code:", joinCode);
+
       // Call the real API
       const joinedFamily = await joinFamily({
         inviteCode: joinCode.trim(),
         userId: user.uid,
-        userName: userProfile.name || user.email || 'Unknown',
-        userEmail: user.email || '',
+        userName: userProfile.name || user.email || "Unknown",
+        userEmail: user.email || "",
       });
       triggerFamilyRefresh();
 
-      console.log('✅ Joined family:', joinedFamily.name);
+      console.log("✅ Joined family:", joinedFamily.name);
 
       // Refresh user profile to get updated familyId
       await refreshUserProfile();
@@ -182,23 +214,43 @@ export default function FamilyScreen() {
       // Load the new family data
       await loadFamilyData();
 
+      const currentFamilyId = joinedFamily.id;
+      if (!currentFamilyId) {
+        console.warn("No familyId found after join. Skipping share prompt.");
+        return;
+      }
+
+      Alert.alert(
+        "Share Existing Documents?",
+        `Would you like to share your existing documents with your new family?`,
+        [
+          { text: "Keep Private", style: "cancel" },
+          {
+            text: "Share with Family",
+            onPress: async () => {
+              await addUserDocumentsToFamily(user.uid, currentFamilyId);
+            },
+          },
+        ]
+      );
+
       // Show success
       Alert.alert(
-        'Joined Family! 🎉',
+        "Joined Family! 🎉",
         `You are now part of "${joinedFamily.name}"`,
         [
           {
-            text: 'OK',
+            text: "OK",
             onPress: () => {
               setShowJoinModal(false);
-              setJoinCode('');
+              setJoinCode("");
             },
           },
         ]
       );
     } catch (error: any) {
-      console.error('❌ Error joining family:', error);
-      Alert.alert('Error', error.message || 'Failed to join family');
+      console.error("❌ Error joining family:", error);
+      Alert.alert("Error", error.message || "Failed to join family");
     } finally {
       setIsProcessing(false);
     }
@@ -209,15 +261,15 @@ export default function FamilyScreen() {
   // ============================================
   const handleInvite = async () => {
     if (!family) return;
-    
+
     const inviteMessage = `Join our PaperPile family group!\n\nFamily: ${family.name}\nInvite Code: ${family.inviteCode}\n\nDownload PaperPile and use this code to join.`;
 
     try {
-      if (Platform.OS === 'web') {
+      if (Platform.OS === "web") {
         Alert.alert(
-          'Invite Code',
+          "Invite Code",
           `Share this code with family members:\n\n${family.inviteCode}`,
-          [{ text: 'OK' }]
+          [{ text: "OK" }]
         );
       } else {
         await Share.share({
@@ -226,7 +278,7 @@ export default function FamilyScreen() {
       }
       setShowInviteModal(false);
     } catch (error) {
-      console.error('Error sharing:', error);
+      console.error("Error sharing:", error);
     }
   };
 
@@ -237,28 +289,50 @@ export default function FamilyScreen() {
     if (!user || !family) return;
 
     Alert.alert(
-      'Remove Member',
+      "Remove Member",
       `Are you sure you want to remove ${memberName} from the family?`,
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: "Cancel", style: "cancel" },
         {
-          text: 'Remove',
-          style: 'destructive',
+          text: "Remove",
+          style: "destructive",
           onPress: async () => {
             try {
-              console.log('🔵 Removing member:', memberId);
+              console.log("🔵 Removing member:", memberId);
+
+              console.log(
+                "🔵 Removing member:",
+                memberId,
+                "from family:",
+                family.id
+              );
               
               await removeMember(user.uid, family.id, memberId);
+              console.log(
+                "🔵 Now removing docs for removed member:",
+                memberId,
+                "family:",
+                family.id
+              );
+              const result = await removeUserDocumentsFromFamily(
+                memberId,
+                family.id
+              );
+              console.log("🔵 Docs cleared:", result);
+
               triggerFamilyRefresh();
-              console.log('✅ Member removed');
-              
+              console.log("✅ Member removed");
+
               // Reload family data
               await loadFamilyData();
-              
-              Alert.alert('Success', `${memberName} has been removed from the family`);
+
+              Alert.alert(
+                "Success",
+                `${memberName} has been removed from the family`
+              );
             } catch (error: any) {
-              console.error('❌ Error removing member:', error);
-              Alert.alert('Error', error.message || 'Failed to remove member');
+              console.error("❌ Error removing member:", error);
+              Alert.alert("Error", error.message || "Failed to remove member");
             }
           },
         },
@@ -273,32 +347,35 @@ export default function FamilyScreen() {
     if (!user || !family) return;
 
     Alert.alert(
-      'Leave Family',
-      'Are you sure you want to leave this family group? You will lose access to shared documents.',
+      "Leave Family",
+      "Are you sure you want to leave this family group? You will lose access to shared documents.",
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: "Cancel", style: "cancel" },
         {
-          text: 'Leave',
-          style: 'destructive',
+          text: "Leave",
+          style: "destructive",
           onPress: async () => {
             try {
-              console.log('🔵 Leaving family...');
-              
+              console.log("🔵 Leaving family...");
+
               await leaveFamily(user.uid, family.id);
+
+              await removeUserDocumentsFromFamily(user.uid, family.id);
+
               triggerFamilyRefresh();
-              
-              console.log('✅ Left family');
-              
+
+              console.log("✅ Left family");
+
               // Refresh user profile
               await refreshUserProfile();
-              
+
               // Clear family data
               setFamily(null);
-              
-              Alert.alert('Left Family', 'You have left the family group');
+
+              Alert.alert("Left Family", "You have left the family group");
             } catch (error: any) {
-              console.error('❌ Error leaving family:', error);
-              Alert.alert('Error', error.message || 'Failed to leave family');
+              console.error("❌ Error leaving family:", error);
+              Alert.alert("Error", error.message || "Failed to leave family");
             }
           },
         },
@@ -312,9 +389,9 @@ export default function FamilyScreen() {
   const renderAvatar = (name: string) => {
     // Get initials from name
     const initials = name
-      .split(' ')
-      .map(word => word[0])
-      .join('')
+      .split(" ")
+      .map((word) => word[0])
+      .join("")
       .toUpperCase()
       .slice(0, 2);
 
@@ -330,8 +407,8 @@ export default function FamilyScreen() {
   // ============================================
   const isCurrentUserAdmin = () => {
     if (!user || !family) return false;
-    const currentMember = family.members.find(m => m.userId === user.uid);
-    return currentMember?.role === 'admin';
+    const currentMember = family.members.find((m) => m.userId === user.uid);
+    return currentMember?.role === "admin";
   };
 
   // ============================================
@@ -343,9 +420,11 @@ export default function FamilyScreen() {
         <View style={styles.header}>
           <Text style={styles.headerTitle}>Family</Text>
         </View>
-        <View style={[styles.emptyContainer, { justifyContent: 'center' }]}>
+        <View style={[styles.emptyContainer, { justifyContent: "center" }]}>
           <ActivityIndicator size="large" color={Colors.primary} />
-          <Text style={[styles.emptySubtitle, { marginTop: 16 }]}>Loading...</Text>
+          <Text style={[styles.emptySubtitle, { marginTop: 16 }]}>
+            Loading...
+          </Text>
         </View>
       </SafeAreaView>
     );
@@ -373,22 +452,37 @@ export default function FamilyScreen() {
 
           {/* Description */}
           <Text style={styles.emptySubtitle}>
-            Create or join a family group to share important documents with loved ones securely.
+            Create or join a family group to share important documents with
+            loved ones securely.
           </Text>
 
           {/* Benefits List */}
           <View style={styles.benefitsList}>
             <View style={styles.benefitItem}>
-              <Ionicons name="checkmark-circle" size={24} color={Colors.success} />
+              <Ionicons
+                name="checkmark-circle"
+                size={24}
+                color={Colors.success}
+              />
               <Text style={styles.benefitText}>Share documents instantly</Text>
             </View>
             <View style={styles.benefitItem}>
-              <Ionicons name="checkmark-circle" size={24} color={Colors.success} />
+              <Ionicons
+                name="checkmark-circle"
+                size={24}
+                color={Colors.success}
+              />
               <Text style={styles.benefitText}>Control what you share</Text>
             </View>
             <View style={styles.benefitItem}>
-              <Ionicons name="checkmark-circle" size={24} color={Colors.success} />
-              <Text style={styles.benefitText}>Keep sensitive docs private</Text>
+              <Ionicons
+                name="checkmark-circle"
+                size={24}
+                color={Colors.success}
+              />
+              <Text style={styles.benefitText}>
+                Keep sensitive docs private
+              </Text>
             </View>
           </View>
 
@@ -407,7 +501,9 @@ export default function FamilyScreen() {
               onPress={() => setShowJoinModal(true)}
             >
               <Ionicons name="enter" size={24} color={Colors.primary} />
-              <Text style={styles.secondaryButtonText}>Join Existing Group</Text>
+              <Text style={styles.secondaryButtonText}>
+                Join Existing Group
+              </Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -422,7 +518,7 @@ export default function FamilyScreen() {
           <View style={styles.modalBackdrop}>
             <View style={styles.modalContent}>
               <Text style={styles.modalTitle}>Create Family Group</Text>
-              
+
               <TextInput
                 style={styles.input}
                 value={familyName}
@@ -438,7 +534,7 @@ export default function FamilyScreen() {
                   style={[styles.modalButton, styles.modalButtonSecondary]}
                   onPress={() => {
                     setShowCreateModal(false);
-                    setFamilyName('');
+                    setFamilyName("");
                   }}
                   disabled={isProcessing}
                 >
@@ -470,7 +566,7 @@ export default function FamilyScreen() {
           <View style={styles.modalBackdrop}>
             <View style={styles.modalContent}>
               <Text style={styles.modalTitle}>Join Family Group</Text>
-              
+
               <TextInput
                 style={styles.input}
                 value={joinCode}
@@ -492,7 +588,7 @@ export default function FamilyScreen() {
                   style={[styles.modalButton, styles.modalButtonSecondary]}
                   onPress={() => {
                     setShowJoinModal(false);
-                    setJoinCode('');
+                    setJoinCode("");
                   }}
                   disabled={isProcessing}
                 >
@@ -530,10 +626,7 @@ export default function FamilyScreen() {
         </TouchableOpacity>
       </View>
 
-      <ScrollView 
-        style={styles.content}
-        showsVerticalScrollIndicator={false}
-      >
+      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* FIX: Family Info Card - Removed invite code section, kept only the header */}
         <View style={styles.familyCard}>
           <View style={styles.familyCardHeader}>
@@ -543,7 +636,8 @@ export default function FamilyScreen() {
             <View style={styles.familyInfo}>
               <Text style={styles.familyName}>{family.name}</Text>
               <Text style={styles.familyMeta}>
-                {family.members.length} {family.members.length === 1 ? 'member' : 'members'}
+                {family.members.length}{" "}
+                {family.members.length === 1 ? "member" : "members"}
               </Text>
             </View>
           </View>
@@ -555,17 +649,13 @@ export default function FamilyScreen() {
           <View style={styles.toggleInfo}>
             <Text style={styles.toggleTitle}>Show All Documents</Text>
             <Text style={styles.toggleSubtitle}>
-              {showAllDocuments 
-                ? 'Showing documents from all family members'
-                : 'Showing only your documents'
-              }
+              {showAllDocuments
+                ? "Showing documents from all family members"
+                : "Showing only your documents"}
             </Text>
           </View>
           <TouchableOpacity
-            style={[
-              styles.toggle,
-              showAllDocuments && styles.toggleActive,
-            ]}
+            style={[styles.toggle, showAllDocuments && styles.toggleActive]}
             onPress={() => setShowAllDocuments(!showAllDocuments)}
           >
             <View
@@ -580,10 +670,11 @@ export default function FamilyScreen() {
         {/* Members Section */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Members</Text>
-          
+
           {family.members.map((member) => {
             const isCurrentUser = member.userId === user?.uid;
-            const canRemove = isCurrentUserAdmin() && !isCurrentUser && member.role !== 'admin';
+            const canRemove =
+              isCurrentUserAdmin() && !isCurrentUser && member.role !== "admin";
 
             return (
               <View key={member.userId} style={styles.memberCard}>
@@ -594,9 +685,10 @@ export default function FamilyScreen() {
                 <View style={styles.memberInfo}>
                   <View style={styles.memberHeader}>
                     <Text style={styles.memberName}>
-                      {member.name}{isCurrentUser && ' (You)'}
+                      {member.name}
+                      {isCurrentUser && " (You)"}
                     </Text>
-                    {member.role === 'admin' && (
+                    {member.role === "admin" && (
                       <View style={styles.adminBadge}>
                         <Text style={styles.adminBadgeText}>Admin</Text>
                       </View>
@@ -612,9 +704,15 @@ export default function FamilyScreen() {
                 {canRemove && (
                   <TouchableOpacity
                     style={styles.memberAction}
-                    onPress={() => handleRemoveMember(member.userId, member.name)}
+                    onPress={() =>
+                      handleRemoveMember(member.userId, member.name)
+                    }
                   >
-                    <Ionicons name="close-circle" size={24} color={Colors.error} />
+                    <Ionicons
+                      name="close-circle"
+                      size={24}
+                      color={Colors.error}
+                    />
                   </TouchableOpacity>
                 )}
               </View>
@@ -645,11 +743,13 @@ export default function FamilyScreen() {
         <View style={styles.modalBackdrop}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Invite Family Member</Text>
-            
+
             <View style={styles.inviteModalCode}>
               <Text style={styles.inviteModalLabel}>Share this code:</Text>
               <View style={styles.inviteModalCodeBox}>
-                <Text style={styles.inviteModalCodeText}>{family.inviteCode}</Text>
+                <Text style={styles.inviteModalCodeText}>
+                  {family.inviteCode}
+                </Text>
               </View>
             </View>
 
@@ -668,8 +768,14 @@ export default function FamilyScreen() {
                 style={[styles.modalButton, styles.modalButtonPrimary]}
                 onPress={handleInvite}
               >
-                <Ionicons name="share-outline" size={20} color={Colors.background} />
-                <Text style={[styles.modalButtonTextPrimary, { marginLeft: 8 }]}>
+                <Ionicons
+                  name="share-outline"
+                  size={20}
+                  color={Colors.background}
+                />
+                <Text
+                  style={[styles.modalButtonTextPrimary, { marginLeft: 8 }]}
+                >
                   Share Code
                 </Text>
               </TouchableOpacity>
